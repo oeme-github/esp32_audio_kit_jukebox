@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" type="text/css" href="/style.css">
+  <link rel="icon" href="/jukebox.ico">
+  <title>HTML5-Jukebox-Projekt</title>
+  <script>
+      //---------------------------------------------------
+      // 
+      function createFileUploader(element, tree, editor)
+      {
+        var xmlHttp;
+
+        var input          = document.createElement("input");
+        input.type         = "file";
+        input.multiple     = false;
+        input.name         = "file";
+        input.id           = "file";
+        document.getElementById(element).appendChild(input);
+        
+        var path           = document.createElement("input");
+        path.id            = "path";
+        path.type          = "text";
+        path.name          = "path";
+        path.defaultValue  = "";
+        path.placeholder   = "<upload to>/<Datei auswählen>";
+        document.getElementById(element).appendChild(path);
+        
+        var uplbtn         = document.createElement("button");
+        uplbtn.innerHTML   = 'Upload';
+        uplbtn.id          = 'uploadbtn';
+        document.getElementById(element).appendChild(uplbtn);
+        
+        var mkdir          = document.createElement("button");
+        mkdir.innerHTML    = 'MkDir';
+        mkdir.id           = 'mkdirbtn';
+        document.getElementById(element).appendChild(mkdir);
+        
+        var rfdir          = document.createElement("button");
+        rfdir.innerHTML    = 'Refresh';
+        rfdir.id           = "refreshbtn";
+        document.getElementById(element).appendChild(rfdir);
+  
+        function httpPostProcessRequest()
+        {
+          console.log("httpPostProcessRequest..");
+          if (xmlHttp.readyState == 4)
+          {
+            if(xmlHttp.status != 200)
+            {
+              alert("ERROR["+xmlHttp.status+"]: "+xmlHttp.responseText);
+            }
+            else 
+            {
+              console.log("call tree.refreshPath("+path.value+")");
+              tree.refreshPath(path.value);
+
+              console.log("clean up...");
+              // clean up
+              path.value  = "";
+              input.value = "";
+              document.getElementById("details").innerHTML = "";
+              // refreshes the table 
+              console.log("refresh site...");
+              document.getElementById("reload").click();
+            }
+          }
+        }
+        
+        function createPath(dir)
+        {
+          console.log("createPath() called.."+dir);
+          xmlHttp = new XMLHttpRequest();
+          xmlHttp.onreadystatechange = httpPostProcessRequest;
+          // create the form
+          var formData = new FormData();
+          formData.append('method' , 'CREATE');
+          formData.append('action' , 'create');
+          formData.append('enctype', '/multipart/form-data');
+          formData.append('fs'     , getSelectedFS());
+          formData.append('name'   , dir );
+          // process request
+          xmlHttp.open("POST", "/file");
+          xmlHttp.send(formData);
+          path.value = dir;
+        }
+
+        rfdir.onclick = function(e)
+        {
+          console.log("refresh clicked..");
+          tree.refreshPath("");
+        };
+        
+        mkdir.onclick = function(e)
+        {
+          console.log("mkdir clicked..");
+          if(path.value.length < 2) 
+            return;
+          var dir = path.value
+          if(dir.indexOf(".") !== -1)
+          {
+            if(dir.lastIndexOf("/") === 0) return;
+            dir = dir.substring(0, dir.lastIndexOf("/"));
+          }
+          createPath(dir);
+          path.value = dir;
+        };
+
+        uplbtn.onclick = function(e)
+        {
+          console.log("uplbtn.onclick..");
+          if(input.files.length === 0)
+          {
+            console.log("input.files.length == 0");
+            return;
+          }
+          console.log("start upload..."+input.files[0]+","+path.value);  
+          xmlHttp = new XMLHttpRequest();
+          xmlHttp.onreadystatechange = httpPostProcessRequest;
+          // swith on progress bar
+          var progressform = "<progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>";
+          document.getElementById("details").innerHTML = progressform;          
+          xmlHttp.upload.addEventListener("progress", progressHandler, false);
+          // create formData and add key, value pairs
+          var formData = new FormData();
+          formData.append('method' , 'POST');
+          formData.append('action' , '/handleupload');
+          formData.append('enctype', '/multipart/form-data');
+          formData.append('file'   , input.files[0], path.value);
+          formData.append('fs'     , getSelectedFS());
+          // cprocess request
+          xmlHttp.open("POST", "/?fs="+getSelectedFS());
+          xmlHttp.send(formData);
+        }
+
+        function progressHandler(event) 
+        {
+          var percent = (event.loaded / event.total) * 100;
+          console.log("progress:"+percent);
+          document.getElementById("progressBar").value = Math.round(percent);
+        }
+
+        //-------------------------------------------------
+        // bei Änderunge des input Elementes (-> bei Auswahl einer Datei)
+        input.onchange = function(e)
+        {
+          console.log("input.onchange..");
+
+          if(input.files.length === 0) 
+            return;
+
+          var filename = input.files[0].name;
+          var ext      = /(?:\.([^.]+))?$/.exec(filename)[1];
+          var name     = /(.*)\.[^.]+$/.exec(filename)[1];
+          
+          console.log("filename: " + filename);
+          console.log("ext     : " + ext );
+          console.log("name    : " + name );  
+
+          console.log("path.value.length:"+path.value.length);
+          
+          if( path.value.length > 0 )
+          {
+            if( path.value.substring(0, path.value.length-1) == "/" )
+              path.value = path.value.substring(0, path.value.length)+filename;
+            else
+              path.value = path.value.substring(0, path.value.length)+"/"+filename;
+          }
+          else
+          {
+            if( getSelectedFS() == "SD" )
+              path.value = "/" + filename;
+            else
+              path.value = filename;
+          }
+          console.log("path.value: " + path.value );
+        }
+      }
+
+      function createTree(element, editor)
+      {
+        var preview  = document.getElementById("preview");
+        var treeRoot = document.createElement("div");
+        treeRoot.className = "css-treeview";
+        document.getElementById(element).appendChild(treeRoot);
+  
+        function loadDownload(path)
+        {
+          console.log("loadDownload("+path+")");
+          document.getElementById('download-frame').src = path+"?download=true";
+        }
+  
+        function playAudio(path)
+        {
+          console.log("playAudio("+path+")");
+          document.getElementById("editor").style.display = "none";
+          preview.style.display = "block";
+          preview.innerHTML =  '<audio controls autoplay> \
+                                  <source src="'+path+'" type="audio/mpeg"> \
+                                Your browser does not support the audio element. \
+                                </audio>'; 
+        }
+
+        function fillFolderMenu(el, path)
+        {
+          console.log("fillFolderMenu("+el+","+path+")");
+          
+          var list = document.createElement("ul");
+          el.appendChild(list);
+          
+          var action = document.createElement("li");
+          list.appendChild(action);
+          
+          var isChecked = document.getElementById(path).checked;
+          
+          var expnd = document.createElement("li");
+          list.appendChild(expnd);
+          
+          if(isChecked)
+          {
+            expnd.innerHTML = "<span>Collapse</span>";
+            expnd.onclick = function(e)
+            {
+              document.getElementById(path).checked = false;
+              if(document.body.getElementsByClassName('contextMenu').length > 0) 
+                document.body.removeChild(el);
+            };
+            
+            var refrsh = document.createElement("li");
+            list.appendChild(refrsh);
+            refrsh.innerHTML = "<span>Refresh</span>";
+            
+            refrsh.onclick = function(e)
+            {
+              var leaf = document.getElementById(path).parentNode;
+              if(leaf.childNodes.length == 3) 
+                leaf.removeChild(leaf.childNodes[2]);
+              httpGet(leaf, path);
+              if(document.body.getElementsByClassName('contextMenu').length > 0) 
+                document.body.removeChild(el);
+            };
+          } 
+          else 
+          {
+            expnd.innerHTML = "<span>Expand</span>";
+            expnd.onclick = function(e)
+            {
+              document.getElementById(path).checked = true;
+              var leaf = document.getElementById(path).parentNode;
+              if(leaf.childNodes.length == 3) 
+                leaf.removeChild(leaf.childNodes[2]);
+              httpGet(leaf, path);
+              if(document.body.getElementsByClassName('contextMenu').length > 0) 
+                document.body.removeChild(el);
+            };
+          }
+
+          if( getSelectedFS() == "SD" )
+          {
+            var upload = document.createElement("li");
+            list.appendChild(upload);
+            upload.innerHTML = "<span>Upload to</span>";
+            upload.onclick = function(e)
+            {
+              console.log("upload.onclick..");
+              var pathEl = document.getElementById("path");
+              if(pathEl)
+              {
+                var subPath = pathEl.value;
+                if(subPath.lastIndexOf("/") < 1) 
+                  pathEl.value = path+subPath;
+                else 
+                  pathEl.value = path.substring(subPath.lastIndexOf("/"))+subPath;
+              }
+              if(document.body.getElementsByClassName('contextMenu').length > 0) 
+                document.body.removeChild(el);
+            };
+          }
+
+          var delFile = document.createElement("li");
+          list.appendChild(delFile);
+          delFile.innerHTML = "<span>Delete</span>";
+          delFile.onclick = function(e)
+          {
+            console.log("foldermenu-delFile.onclick:"+path);
+            httpDelete(path);
+            if(document.body.getElementsByClassName('contextMenu').length > 0)
+              document.body.removeChild(el);
+          };
+        }
+  
+        function fillFileMenu(el, path)
+        {
+          console.log("fillFileMenu("+el+","+path+")");
+          
+          var list = document.createElement("ul");
+          el.appendChild(list);
+          
+          var action = document.createElement("li");
+          list.appendChild(action);
+          
+          if(isAudioFile(path))
+          {
+            action.innerHTML = "<span>Play</span>";
+            action.onclick = function(e)
+            {
+              playAudio(path);
+              if(document.body.getElementsByClassName('contextMenu').length > 0) 
+                document.body.removeChild(el);
+            };
+          }
+
+          var download = document.createElement("li");
+          list.appendChild(download);
+          download.innerHTML = "<span>Download</span>";
+          download.onclick = function(e)
+          {
+            loadDownload(path);
+            if(document.body.getElementsByClassName('contextMenu').length > 0) 
+              document.body.removeChild(el);
+          };
+
+          var delFile = document.createElement("li");
+          list.appendChild(delFile);
+          delFile.innerHTML = "<span>Delete</span>";
+          delFile.onclick = function(e)
+          {
+            console.log("filemenu-delFile.onclick:"+path);
+            httpDelete(path);
+            if(document.body.getElementsByClassName('contextMenu').length > 0) 
+              document.body.removeChild(el);
+          };
+        }
+  
+        function showContextMenu(e, path, isfile)
+        {
+          console.log("showContextMenu("+e+","+path+","+isfile+")");
+          var divContext = document.createElement("div");
+          var scrollTop = document.body.scrollTop ? document.body.scrollTop : document.documentElement.scrollTop;
+          var scrollLeft = document.body.scrollLeft ? document.body.scrollLeft : document.documentElement.scrollLeft;
+          var left = e.clientX + scrollLeft;
+          var top = e.clientY + scrollTop;
+          divContext.className = 'contextMenu';
+          divContext.style.display = 'block';
+          divContext.style.left = left + 'px';
+          divContext.style.top = top + 'px';
+          if(isfile) 
+            fillFileMenu(divContext, path);
+          else 
+            fillFolderMenu(divContext, path);
+          document.body.appendChild(divContext);
+          var width = divContext.offsetWidth;
+          var height = divContext.offsetHeight;
+          divContext.onmouseout = function(e)
+          {
+            if(e.clientX < left || e.clientX > (left + width) || e.clientY < top || e.clientY > (top + height))
+            {
+              if(document.body.getElementsByClassName('contextMenu').length > 0) 
+                document.body.removeChild(divContext);
+            }
+          };
+        }
+  
+        function createTreeLeaf(path, name, size)
+        {
+          console.log("ceateTreeLeaf("+path+","+name+","+size+")");
+          var leaf = document.createElement("li");
+          leaf.id = name.toLowerCase();
+          var label = document.createElement("span");
+          label.textContent = name.toLowerCase();
+          leaf.appendChild(label);
+          leaf.oncontextmenu = function(e)
+          {
+            e.preventDefault();
+            e.stopPropagation();
+            showContextMenu(e, leaf.id, true);
+          };
+          return leaf;
+        }
+  
+        function createTreeBranch(path, name, disabled)
+        {
+          console.log("ceateTreeBranch("+path+","+name+","+disabled+")");
+          var leaf   = document.createElement("li");
+          var check  = document.createElement("input");
+          check.type = "checkbox";
+          check.id   = name.toLowerCase();
+          if(typeof disabled !== "undefined" && disabled)
+          {
+            check.disabled = "disabled";
+          }
+          leaf.appendChild(check);
+          var label = document.createElement("label");
+          label.for = check.id;
+          label.textContent = name.toLowerCase();
+          leaf.appendChild(label);
+          
+          check.onchange = function(e)
+          {
+            console.log("check.onchange...");
+            if(check.checked)
+            {
+              if(leaf.childNodes.length == 3) leaf.removeChild(leaf.childNodes[2]);
+              httpGet(leaf, check.id);
+            }
+          };
+
+          label.onclick = function(e)
+          {
+            console.log("label.onclick...");
+            if(!check.checked)
+            {
+              check.checked = true;
+              if(leaf.childNodes.length == 3) 
+              {
+                leaf.removeChild(leaf.childNodes[2]);
+              }
+              httpGet(leaf, check.id);
+            } 
+            else 
+            {
+              check.checked = false;
+            }
+          };
+
+          leaf.oncontextmenu = function(e)
+          {
+            console.log("leaf.oncontextmenu..");
+            e.preventDefault();
+            e.stopPropagation();
+            showContextMenu(e, check.id, false);
+          }
+          return leaf;
+        }
+  
+        function addList(parent, path, items)
+        {
+          console.log("addList("+parent+","+path+","+items+")");
+          var list = document.createElement("ul");
+          parent.appendChild(list);
+          var ll = items.length;
+          for(var i = 0; i < ll; i++)
+          {
+            var item = items[i];
+            var itemEl;
+            if(item.type === "file")
+            {
+              itemEl = createTreeLeaf(path, item.name, item.size);
+            } 
+            else 
+            {
+              itemEl = createTreeBranch(path, item.name);
+            }
+            list.appendChild(itemEl);
+          }
+        }
+  
+        function isAudioFile(path)
+        {
+          console.log("isAudioFile("+path+")");
+          var ext = /(?:\.([^.]+))?$/.exec(path)[1];
+          if(typeof ext !== undefined)
+          {
+            switch(ext)
+            {
+              case "mpeg":
+              case "mp3":
+              case "mp4":
+              case "m4a":
+                return true;
+            }
+          }
+          return false;
+        }
+        
+        this.refreshPath = function(path)
+        {
+          console.log("this.refreshPath.. : "+path);
+
+          if( path.substring(path.length-1) == "/" )
+          {
+            path = path.substring(0, path.length-1);
+            console.log("corrected path to :" + path);
+          }
+
+          if(path.lastIndexOf('/') < 1)
+          {
+            path = '';
+            treeRoot.removeChild(treeRoot.childNodes[0]);
+            httpGet(treeRoot, "");
+          } 
+          else 
+          {
+            path = path.substring(0, path.lastIndexOf('/'));
+            var leaf = document.getElementById(path).parentNode;
+            if(leaf.childNodes.length == 3) 
+              leaf.removeChild(leaf.childNodes[2]);
+            httpGet(leaf, path);
+          }
+        };
+  
+        function delCb(path)
+        {
+          console.log("delCB("+path+")");
+          return function()
+          {
+            if (xmlHttp.readyState == 4)
+            {
+              if(xmlHttp.status != 200)
+              {
+                alert("ERROR["+xmlHttp.status+"]: "+xmlHttp.responseText);
+              } 
+              else 
+              {
+                if(path.lastIndexOf('/') < 1)
+                {
+                  path = '';
+                  treeRoot.removeChild(treeRoot.childNodes[0]);
+                  httpGet(treeRoot, "");
+                } 
+                else 
+                {
+                  path = path.substring(0, path.lastIndexOf('/'));
+                  var leaf = document.getElementById(path).parentNode;
+                  if(leaf.childNodes.length == 3) 
+                  {
+                    leaf.removeChild(leaf.childNodes[2]);
+                  }
+                  httpGet(leaf, path);
+                }
+              }
+            }
+          }
+        }
+  
+        function httpDelete(filename)
+        {
+          console.log("httpDelete("+filename+")");
+          xmlHttp = new XMLHttpRequest();
+          xmlHttp.onreadystatechange = delCb(filename);
+          
+          console.log("process delete...")
+
+          var formData = new FormData();
+          formData.append('method' , 'DELETE');
+          formData.append('action' , 'delete');
+          formData.append('fs'     , getSelectedFS());
+          formData.append('name'   , filename );
+          
+          console.log("process delete...");
+          // process request
+          xmlHttp.open("POST", "/file");
+          xmlHttp.send(formData);
+
+          // refreshes the table 
+          console.log("refresh site...");
+          document.getElementById("reload").click();
+        }
+  
+        function getCb(parent, path)
+        {
+          console.log("getCb("+parent+","+path+")");
+          return function()
+          {
+            if (xmlHttp.readyState == 4)
+            {
+              //clear loading
+              if(xmlHttp.status == 200) 
+              {
+                addList(parent, path, JSON.parse(xmlHttp.responseText));
+              }
+            }
+          }
+        }
+  
+        function httpGet(parent, path)
+        {
+          console.log("httpGet("+parent+","+path+")");
+          xmlHttp = new XMLHttpRequest(parent, path);
+          xmlHttp.onreadystatechange = getCb(parent, path);
+          xmlHttp.open("GET", "/list?fs="+getSelectedFS()+"&dir="+path, true);
+          xmlHttp.send(null);
+
+          document.getElementById("sdfree").refresh;
+        }
+  
+        httpGet(treeRoot, " ");
+        return this;
+      }
+
+      function createEditor(element, file, lang, theme, type){
+        function getLangFromFilename(filename){
+          var lang = "plain";
+          var ext = /(?:\.([^.]+))?$/.exec(filename)[1];
+          if(typeof ext !== undefined){
+            switch(ext){
+              case "txt": lang = "plain"; break;
+              case "htm": lang = "html"; break;
+              case "js": lang = "javascript"; break;
+              case "c": lang = "c_cpp"; break;
+              case "cpp": lang = "c_cpp"; break;
+              case "css":
+              case "scss":
+              case "php":
+              case "html":
+              case "json":
+              case "xml":
+                lang = ext;
+            }
+          }
+          return lang;
+        }
+  
+        if(typeof file === "undefined") file = "/index.html";
+  
+        if(typeof lang === "undefined"){
+          lang = getLangFromFilename(file);
+        }
+  
+        if(typeof theme === "undefined") theme = "textmate";
+  
+        if(typeof type === "undefined"){
+          type = "text/"+lang;
+          if(lang === "c_cpp") type = "text/plain";
+        }
+  
+        var xmlHttp = null;
+        var editor = ace.edit(element);
+  
+        //post
+        function httpPostProcessRequest(){
+          if (xmlHttp.readyState == 4){
+            if(xmlHttp.status != 200) alert("ERROR["+xmlHttp.status+"]: "+xmlHttp.responseText);
+          }
+        }
+        function httpPost(filename, data, type){
+          xmlHttp = new XMLHttpRequest();
+          xmlHttp.onreadystatechange = httpPostProcessRequest;
+          var formData = new FormData();
+          formData.append("data", new Blob([data], { type: type }), filename);
+          xmlHttp.open("POST", "/");
+          xmlHttp.send(formData);
+        }
+        //get
+        function httpGetProcessRequest(){
+          if (xmlHttp.readyState == 4){
+            document.getElementById("preview").style.display = "none";
+            document.getElementById("editor").style.display = "block";
+            if(xmlHttp.status == 200) editor.setValue(xmlHttp.responseText);
+            else editor.setValue("");
+            editor.clearSelection();
+          }
+        }
+        function httpGet(theUrl){
+            xmlHttp = new XMLHttpRequest();
+            xmlHttp.onreadystatechange = httpGetProcessRequest;
+            xmlHttp.open("GET", theUrl, true);
+            xmlHttp.send(null);
+        }
+  
+        if(lang !== "plain") editor.getSession().setMode("ace/mode/"+lang);
+        editor.setTheme("ace/theme/"+theme);
+        editor.$blockScrolling = Infinity;
+        editor.getSession().setUseSoftTabs(true);
+        editor.getSession().setTabSize(2);
+        editor.setHighlightActiveLine(true);
+        editor.setShowPrintMargin(false);
+
+        editor.commands.addCommand(
+          {
+            name: 'saveCommand',
+            bindKey: {win: 'Ctrl-S',  mac: 'Command-S'},
+            exec: function(editor) 
+            {
+              httpPost(file, editor.getValue()+"", type);
+            },
+            readOnly: false
+          }
+        );
+        
+        editor.commands.addCommand(
+          {
+            name: 'undoCommand',
+            bindKey: {win: 'Ctrl-Z',  mac: 'Command-Z'},
+            exec: function(editor) 
+            {
+              editor.getSession().getUndoManager().undo(false);
+            },
+            readOnly: false
+          }
+        );
+        
+        editor.commands.addCommand(
+          {
+            name: 'redoCommand',
+            bindKey: {win: 'Ctrl-Shift-Z',  mac: 'Command-Shift-Z'},
+            exec: function(editor) 
+            {
+              editor.getSession().getUndoManager().redo(false);
+            },
+            readOnly: false
+          }
+        );
+
+        httpGet(file);
+        
+        editor.loadUrl = function(filename)
+        {
+          file = filename;
+          lang = getLangFromFilename(file);
+          type = "text/"+lang;
+          if(lang !== "plain") 
+            editor.getSession().setMode("ace/mode/"+lang);
+          httpGet(file);
+        }
+        return editor;
+      }
+
+      function onBodyLoad()
+      {
+        var vars = {};
+        var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) { vars[key] = value; });
+        var editor = createEditor("editor", vars.file, vars.lang, vars.theme);
+        var tree = createTree("tree", editor);
+        createFileUploader("uploader", tree, editor);
+        document.getElementById("storagename").innerHTML = "Musikspeicher";
+      };
+
+      function ValidateForm()
+      { 
+        console.log("ValidateForm()");
+        if(getSelectedFS()=="SD")
+        {
+          document.getElementById("storagename").innerHTML = "Musikspeicher";
+          document.getElementById("mkdirbtn").disabled = false;
+          document.getElementById("file" ).value = "";
+          document.getElementById("path" ).value = "";
+          document.getElementById("path" ).placeholder = "<upload to>/<Datei auswählen>";
+        }
+        else
+        {
+          document.getElementById("storagename").innerHTML = "Programmspeicher";
+          document.getElementById("mkdirbtn").disabled = true;
+          document.getElementById("file" ).value = "";
+          document.getElementById("path" ).value = "";
+          document.getElementById("path" ).placeholder = "<Datei auswählen>";
+        }
+        top.document.getElementById("refreshbtn").click();
+      }      
+
+      function getSelectedFS()
+      {
+          var radioButtons = document.getElementsByName("speicher");
+          for(var i = 0; i < radioButtons.length; i++)
+          {
+              if(radioButtons[i].checked == true)
+              {
+                return radioButtons[i].value;
+              }
+          }
+          return "";
+      }
+
+</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.1.9/ace.js" type="text/javascript" charset="utf-8"></script>
+</head>
+
+<body onload="onBodyLoad();">
+  <logo>
+    <img src="Logo_Jukebox_micro.png" alt="Logo des Fernsehsender Jukebox">
+  </logo>
+  <header>
+    <h1>%TITLE%</h1>
+  </header>
+
+  <nav>
+    <form method="post">
+      <div class="toggle-buttons">
+          <table id="radio-buttons">
+            <tr>
+              <td>
+                <input type="radio" id="sdfs" name="speicher" value="SD" onclick="ValidateForm();" checked>
+                <label for="sdfs">Musikspeicher</label> 
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <input type="radio" id="spiffs" name="speicher" value="SPIFFS" onclick="ValidateForm();">
+                <label for="spiffs">Programmspeicher</label>
+              </td>
+            </tr>
+          </table>
+      </div>
+    </form>
+  </nav>
+
+  <article>
+    <h3 id="storagename"></h3>
+    <div id="uploader"></div>
+    <div id="tree"></div>
+    <div id="editor"></div>
+    <div id="preview"></div>
+    <div id="details"></div>
+    <iframe id=download-frame></iframe>
+  </article>
+
+  <news>
+    <h3>%FIRMWARE%</h3>
+  </news>
+
+  <aside>
+    <table>
+      <tr>
+        <th><h3>Speicher</h3></th>
+        <th><input id="reload" type="button" value="Reload" onClick="document.location.reload(true)"></th>
+      </tr>
+    </table>
+    <table id="storageinfo">
+      <tr>
+        <th>Speicher</th>
+        <th>frei</th>
+        <th>belegt</th>
+        <th>gesamt</th>
+      </tr>
+      <tr>
+        <td>SD Karte</td>
+        <td><span id="sdfree">%SD_FREE%</span></td>
+        <td><span id="sdused">%SD_USED%</span></td>
+        <td><span id="sdtotal">%SD_TOTAL%</span></td>
+      </tr>
+      <tr>
+        <td>SPIFFS</th>
+        <td><span id="spiffsfree">%SPIFFS_FREE%</span></td>
+        <td><span id="spiffsused">%SPIFFS_USED%</span></td>
+        <td><span id="spiffstotal">%SPIFFS_TOTAL%</span></td>
+      </tr>
+    </table>
+  </aside>
+  
+  <footer>
+    <p>Jukebox - M100K Stereo von Harting  © 2023 by jr</p>
+  </footer>
+</body>
+</html>
