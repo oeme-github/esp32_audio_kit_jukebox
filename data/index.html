@@ -298,18 +298,30 @@
           var list = document.createElement("ul");
           el.appendChild(list);
           
-          var action = document.createElement("li");
-          list.appendChild(action);
+          var action1 = document.createElement("li");
+          list.appendChild(action1);
+
+          var action2 = document.createElement("li");
+          list.appendChild(action2);
           
           if(isAudioFile(path))
           {
-            action.innerHTML = "<span>Play</span>";
-            action.onclick = function(e)
+            action1.innerHTML = "<span>Play</span>";
+            action1.onclick = function(e)
             {
               playAudio(path);
               if(document.body.getElementsByClassName('contextMenu').length > 0) 
                 document.body.removeChild(el);
             };
+
+            action2.innerHTML = "<span>Play</span>";
+            action2.onclick = function(e)
+            {
+              httpPlay(path);
+              if(document.body.getElementsByClassName('contextMenu').length > 0) 
+                document.body.removeChild(el);
+            };
+
           }
 
           var download = document.createElement("li");
@@ -534,7 +546,31 @@
             }
           }
         }
-  
+
+        function httpPlay(filename)
+        {
+          console.log("httpPlay("+filename+")");
+          xmlHttp = new XMLHttpRequest();
+          xmlHttp.onreadystatechange = httpPostProcessRequest;
+          
+          var formData = new FormData();
+          formData.append('method' , 'POST');
+          formData.append('action' , 'play');
+          formData.append('fs'     , getSelectedFS());
+          formData.append('name'   , filename );
+          // process request
+          xmlHttp.open("POST", "/file");
+          xmlHttp.send(formData);
+        }
+
+        //post
+        function httpPostProcessRequest(){
+          if (xmlHttp.readyState == 4){
+            if(xmlHttp.status != 200) alert("ERROR["+xmlHttp.status+"]: "+xmlHttp.responseText);
+          }
+        }
+        
+
         function httpDelete(filename)
         {
           console.log("httpDelete("+filename+")");

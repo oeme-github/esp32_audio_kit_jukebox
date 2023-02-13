@@ -8,13 +8,14 @@
 
 #include "MyConfigServer.h"
 #include "filelib.h"
+#include "deflib.h"
 
-typedef struct 
+
+typedef struct
 { 
     String msg; 
     int iRet; 
 } RetCode;
-
 
 class MyWebServer
 {
@@ -29,6 +30,9 @@ private:
     boolean isRegToMDNS    = false;
     StaticJsonDocument<1024> jsonConfig;
     int port;
+
+    int iIndex = 0;
+    xQueueHandle hQueueAudioPlayer;
 
 public:
     MyWebServer();
@@ -51,5 +55,8 @@ public:
     RetCode createDir(fs::FS *fs_, String path); 
 
     StaticJsonDocument<1024> *getConfig();
+
+    void setQueueAudioPlayer(xQueueHandle hQueueAudioPlayer_);
+    RetCode sendToAudioPlayer(String *fileName);
 };
 

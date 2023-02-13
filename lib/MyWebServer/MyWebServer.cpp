@@ -238,6 +238,8 @@ MyWebServer::~MyWebServer()
 void MyWebServer::startWebServer()
 {
     /*-----------------------------------------------------*/
+    //this->hQueueAudioPlayer = hQueue_;
+    /*-----------------------------------------------------*/
     /* load config                                         */
     if(!this->loadConfig())
     {
@@ -510,6 +512,13 @@ boolean MyWebServer::begin()
                                 RetCode retCode = this->createDir(&fs, fileName);
                                 request->send(retCode.iRet, "text/plain", retCode.msg);
                             } 
+                            else if (fileAction == "play") 
+                            {
+                                msg += " started";
+
+                                RetCode retCode = this->sendToAudioPlayer(&fileName);
+                                request->send(retCode.iRet, "text/plain", retCode.msg);
+                            } 
                             else 
                             {
                                 msg += " ERROR: invalid action param supplied";
@@ -752,4 +761,47 @@ RetCode MyWebServer::createDir(fs::FS *fs_, String path)
 StaticJsonDocument<1024> *MyWebServer::getConfig()
 {
     return &this->jsonConfig;
+}
+
+
+void MyWebServer::setQueueAudioPlayer(xQueueHandle hQueueAudioPlayer_)
+{
+    this->hQueueAudioPlayer = hQueueAudioPlayer_;
+
+}
+
+RetCode MyWebServer::sendToAudioPlayer(String *fileName)
+{
+    Serial.print("sendToAudioPlayer("); Serial.print(fileName->c_str()); Serial.println(")");
+
+    /*----------------------------------------------------*/
+    /* setup the queue                                    */
+    my_struct TXmy_struct;
+	uint32_t TickDelay = pdMS_TO_TICKS(2000);
+    RetCode retCode;
+    
+    Serial.println( "Entered SENDER-Task\n about to SEND to the queue\n\n" );
+
+    /********** LOAD THE DATA ***********/
+    if( this->iIndex > 1000)
+        this->iIndex=0;
+    TXmy_struct.counter     = this->iIndex++;
+    TXmy_struct.large_value = 1000 + this->iIndex*20;
+    strcpy(TXmy_struct.str, fileName->c_str());
+
+    /***** send to the queue ****/
+    if (xQueueSend(this->hQueueAudioPlayer, (void *)&TXmy_struct, portMAX_DELAY) == pdPASS)
+    {
+        retCode.iRet = 200;
+        retCode.msg  = "--> filename sended";
+    }
+    else
+    {
+        retCode.iRet = 500;
+        retCode.msg  = "ERROR: sending filename";
+    }
+    Serial.println( retCode.msg );
+    vTaskDelay(TickDelay);
+    return retCode;
+
 }
