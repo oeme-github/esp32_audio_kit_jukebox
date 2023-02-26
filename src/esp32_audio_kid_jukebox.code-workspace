@@ -1,0 +1,33 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "queuetest",
+			"path": "../../queuetest"
+		},
+		{
+			"name": "testaudiokit",
+			"path": "../../testaudiokit"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"random": "cpp",
+			"*.tcc": "cpp",
+			"optional": "cpp",
+			"istream": "cpp",
+			"ostream": "cpp",
+			"ratio": "cpp",
+			"system_error": "cpp",
+			"array": "cpp",
+			"functional": "cpp",
+			"regex": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"utility": "cpp"
+		},
+		"powershell.cwd": "c:\\Users\\jroem\\Documents\\PlatformIO\\Projects\\esp32_audio_kid_jukebox"
+	}
+}

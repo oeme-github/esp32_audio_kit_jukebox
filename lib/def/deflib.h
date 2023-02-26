@@ -2,7 +2,6 @@
 
 #define QUEUE_SIZE 20
 
-
 /**************** STRUCTURE DEFINITION *****************/
 typedef struct {
 	char str[50];

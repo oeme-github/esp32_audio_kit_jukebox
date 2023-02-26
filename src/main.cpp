@@ -7,6 +7,15 @@
 #include "AudioCodecs/CodecMP3Helix.h"
 
 #include "MyWebServer.h"
+#include "readjukekeys.h"
+
+#include <Wire.h>
+#include <INA219_WE.h>
+
+#define I2C_ADDRESS_LETTER 0x40
+#define I2C_ADDRESS_NUMBER 0x41
+#define I2C_SDA 23
+#define I2C_SCL 22
 
 TaskHandle_t hTaskWebServer;
 TaskHandle_t hTaskAudioPlayer;
@@ -22,9 +31,17 @@ File audioFile;
 VolumeStream volume;
 LogarithmicVolumeControl lvc;
 
+/* There are several ways to create your INA219 object:
+ * INA219_WE ina219 = INA219_WE(); -> uses Wire / I2C Address = 0x40
+ * INA219_WE ina219 = INA219_WE(I2C_ADDRESS); -> uses Wire / I2C_ADDRESS
+ * INA219_WE ina219 = INA219_WE(&Wire); -> you can pass any TwoWire object
+ * INA219_WE ina219 = INA219_WE(&Wire, I2C_ADDRESS); -> all together
+ */
+INA219_WE ina219_letter = INA219_WE(I2C_ADDRESS_LETTER);
+INA219_WE ina219_number = INA219_WE(I2C_ADDRESS_NUMBER);
+
 int indx1 = 0;
 xQueueHandle hQueue_global;
-
 
 /**
  * @brief htaskWebServerCode()
@@ -98,6 +115,10 @@ void taskAudioPlayerCode( void * pvParameters )
         Serial.println("clean up ...");
         audioFile.close();
       }
+      else
+      {
+        Serial.println("could not open file!");
+      }
 		}
     else
     {
@@ -107,6 +128,20 @@ void taskAudioPlayerCode( void * pvParameters )
   }
 }
 
+String getSong(int iLetter_, int iNumber_)
+{
+  String song;
+  Serial.print( "getSong letter: "); Serial.print(iLetter_); Serial.print(" number: "); Serial.println(iNumber_);
+  if(iLetter_ <= 5 )
+  {
+    song = "/01 Rough Justice.mp3";
+  }
+  else
+  {
+    song = "/07 She Saw Me Coming.mp3";
+  }
+  return song;
+}
 
 /* 
 * SETUP 
@@ -116,7 +151,23 @@ void setup()
   /*-------------------------------------------------------*/
   /* Start serail                                          */
   Serial.begin(115200);
-  AudioLogger::instance().begin(Serial, AudioLogger::Info);  
+  AudioLogger::instance().begin(Serial, AudioLogger::Warning);  
+  /*-------------------------------------------------------*/
+  /* init INA219                                           */
+  Wire.begin(I2C_SDA, I2C_SCL);
+  while(!ina219_letter.init())
+  {
+    Serial.println("INA219_letter not connected!");
+    vTaskDelay(2000/portTICK_PERIOD_MS);
+  } 
+  ina219_letter.setADCMode(SAMPLE_MODE_16); 
+/*  while(!ina219_number.init())
+  {
+    Serial.println("INA219_number not connected!");
+    vTaskDelay(2000/portTICK_PERIOD_MS);
+  }
+  ina219_number.setADCMode(SAMPLE_MODE_16); 
+*/  
   /*-------------------------------------------------------*/
   /* create QUEUE                                          */
   hQueue_global = xQueueCreate(QUEUE_SIZE, sizeof (my_struct));
@@ -183,7 +234,60 @@ void setup()
 /*
 * LOOP
 */
+int potValue1 = 0;
+int potValue2 = 0;
+boolean activated1 = false;
+boolean activeted2 = false;
+
 void loop() {
   // put your main code here, to run repeatedly:
-  vTaskDelete(NULL);
+  if(!activated1)
+  {
+    potValue1 = AdcConvert(&ina219_letter);
+    Serial.print("NUMBER_BTN value:"); Serial.println(potValue1);
+    if( potValue1 > 0 )
+    {
+      activated1 = true;
+      vTaskDelay(1000/portTICK_PERIOD_MS);
+    }
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+  }
+  if(activated1 & !activeted2)
+  {
+    potValue2 = AdcConvert(&ina219_letter);
+    Serial.print("LETTER_BTN value:"); Serial.println(potValue2);
+    if( potValue2 > 0 )
+    {
+      activeted2 = true;
+    }
+  }
+
+  if( activated1 && activeted2 )
+  {
+    /*----------------------------------------------------*/
+    /* setup the queue                                    */
+    my_struct TXmy_struct;
+	  uint32_t TickDelay = pdMS_TO_TICKS(2000);
+    
+    Serial.println( "Entered SENDER-Task, about to SEND to the queue..." );
+
+    TXmy_struct.counter     = potValue1;
+    TXmy_struct.large_value = potValue2;
+
+    strcpy(TXmy_struct.str, getSong(potValue1, potValue2).c_str());
+
+    /***** send to the queue ****/
+    if (xQueueSend(hQueue_global, (void *)&TXmy_struct, portMAX_DELAY) == pdPASS)
+    {
+        Serial.println( "--> filename sended" );
+    }
+    else
+    {
+        Serial.println( "ERROR: sending filename" );
+    }
+    activated1 = false;
+    activeted2 = false;
+    vTaskDelay(TickDelay);
+  }
+  vTaskDelay(100/portTICK_PERIOD_MS);
 }
