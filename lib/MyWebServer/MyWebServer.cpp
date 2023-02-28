@@ -1,6 +1,5 @@
 #include "MyWebServer.h"
 
-
 const char *title = "Jukebox";
 
 String humanReadableSize(const size_t bytes) 
@@ -288,13 +287,16 @@ boolean MyWebServer::loadConfig()
     else
     {
         this->configServer   = new MyConfigServer();
-        this->jsonConfig     = configServer->loadConfig(&SPIFFS);
+        this->configServer->loadConfig(&SPIFFS);
+
+        if( !this->configServer->isConfigLoaded() )
+        {
+            this->createConfigJson();
+        }
         this->isConfigLoaded = true;
 
-        if( this->jsonConfig.containsKey("title") )
-            title = this->jsonConfig["title"];
-        else
-            this->jsonConfig["title"] = title;
+        if( configServer->containsKey("title") )
+            title = this->configServer->getElement("title").c_str();
     }
     return this->isConfigLoaded;
 }
@@ -329,15 +331,19 @@ boolean MyWebServer::connectWifi()
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
     // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
     // then goes into a blocking loop awaiting configuration and will return success result
-    return wm.autoConnect( jsonConfig["ap"],jsonConfig["appw"]); // password protected ap
+    return wm.autoConnect( this->configServer->getElement("ap").c_str(), this->configServer->getElement("appw").c_str()); // password protected ap
 
 }
 
 boolean MyWebServer::regToMDNS()
 {
-    const char * host = jsonConfig["host"];
-    int port = jsonConfig["port"];
-    if(MDNS.begin(host)) 
+    String host = this->configServer->getElement("host");
+    int port    = this->configServer->getElement("port").toInt();
+
+    Serial.print("host :"); Serial.println(host);
+    Serial.print("port :"); Serial.println(port);
+
+    if(MDNS.begin(host.c_str())) 
     {
         MDNS.addService("http", "tcp", port);
         Serial.println("MDNS responder started");
@@ -351,6 +357,7 @@ boolean MyWebServer::regToMDNS()
         Serial.println("Could not register to MDNS!!");
         Serial.print("You can connect to http://");
         Serial.println(WiFi.localIP());
+        this->isRegToMDNS = false;
     }
     return this->isRegToMDNS;
 }
@@ -360,7 +367,7 @@ boolean MyWebServer::begin()
     Serial.println("MyWebServer::begin()");
     /*-----------------------------------------------------*/
     /* start the web-server                                */
-    int port = this->jsonConfig["port"];
+    int port = this->configServer->getElement("port").toInt();
     server = new AsyncWebServer(port);
     /*-----------------------------------------------------*/
     /* configure the server                                */
@@ -578,7 +585,8 @@ boolean MyWebServer::begin()
 bool MyWebServer::checkWebAuth(AsyncWebServerRequest * request) 
 {
     bool isAuthenticated = false;
-    if (request->authenticate(this->jsonConfig["user"], this->jsonConfig["passwd"] )) {
+    if( request->authenticate( this->configServer->getElement("user").c_str(), this->configServer->getElement("passwd").c_str() )) 
+    {
         Serial.println("is authenticated via username and password");
         isAuthenticated = true;
     }
@@ -758,11 +766,6 @@ RetCode MyWebServer::createDir(fs::FS *fs_, String path)
     return retCode;
 }
 
-StaticJsonDocument<1024> *MyWebServer::getConfig()
-{
-    return &this->jsonConfig;
-}
-
 
 void MyWebServer::setQueueAudioPlayer(xQueueHandle hQueueAudioPlayer_)
 {
@@ -783,10 +786,6 @@ RetCode MyWebServer::sendToAudioPlayer(String *fileName)
     Serial.println( "Entered SENDER-Task\n about to SEND to the queue\n\n" );
 
     /********** LOAD THE DATA ***********/
-    if( this->iIndex > 1000)
-        this->iIndex=0;
-    TXmy_struct.counter     = this->iIndex++;
-    TXmy_struct.large_value = 1000 + this->iIndex*20;
     strcpy(TXmy_struct.str, fileName->c_str());
 
     /***** send to the queue ****/
@@ -804,4 +803,19 @@ RetCode MyWebServer::sendToAudioPlayer(String *fileName)
     vTaskDelay(TickDelay);
     return retCode;
 
+}
+
+
+void MyWebServer::createConfigJson()
+{
+    this->configServer->putElement("version", "v0.0.1"           );
+    this->configServer->putElement("host"   , "esp32jukebox"     );
+    this->configServer->putElement("port"   , "80"               );
+    this->configServer->putElement("user"   , "admin"            );
+    this->configServer->putElement("passwd" , "admin"            );
+    this->configServer->putElement("ap"     , "AutoConnectAP"    );
+    this->configServer->putElement("appw"   , "jukebox2wifi"     );
+    this->configServer->putElement("title"  , "K'furter Musikbox");
+
+    this->configServer->saveToConfigfile();
 }

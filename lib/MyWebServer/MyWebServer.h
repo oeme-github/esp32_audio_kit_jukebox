@@ -28,11 +28,10 @@ private:
     fs::FS *fs;
     boolean isConfigLoaded = false;
     boolean isRegToMDNS    = false;
-    StaticJsonDocument<1024> jsonConfig;
     int port;
-
-    int iIndex = 0;
     xQueueHandle hQueueAudioPlayer;
+
+    void createConfigJson();
 
 public:
     MyWebServer();
@@ -53,8 +52,6 @@ public:
 
     RetCode deleteRecursive(fs::FS *fs_, String path); 
     RetCode createDir(fs::FS *fs_, String path); 
-
-    StaticJsonDocument<1024> *getConfig();
 
     void setQueueAudioPlayer(xQueueHandle hQueueAudioPlayer_);
     RetCode sendToAudioPlayer(String *fileName);

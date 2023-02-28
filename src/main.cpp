@@ -31,6 +31,8 @@ File audioFile;
 VolumeStream volume;
 LogarithmicVolumeControl lvc;
 
+MyConfigServer configServer;
+
 /* There are several ways to create your INA219 object:
  * INA219_WE ina219 = INA219_WE(); -> uses Wire / I2C Address = 0x40
  * INA219_WE ina219 = INA219_WE(I2C_ADDRESS); -> uses Wire / I2C_ADDRESS
@@ -93,8 +95,6 @@ void taskAudioPlayerCode( void * pvParameters )
 		if (xQueueReceive(hQueue_global, &Rptrtostruct, portMAX_DELAY) == pdPASS)
 		{
    	  Serial.println( "Received from QUEUE:\n" );
-   	  Serial.println( Rptrtostruct.counter );
-   	  Serial.println( Rptrtostruct.large_value );
    	  Serial.println( Rptrtostruct.str );
 
       Serial.print("<--"); Serial.println(Rptrtostruct.str);
@@ -128,30 +128,148 @@ void taskAudioPlayerCode( void * pvParameters )
   }
 }
 
+/**
+ * @brief  getSong()      : returns the path and name to a song
+ * @param  {int} iLetter_ : number of letter button (1-10)
+ * @param  {int} iNumber_ : number of number button (1-10)
+ * @return {String}       : full name of song
+ */
 String getSong(int iLetter_, int iNumber_)
 {
-  String song;
+  char song[3];
   Serial.print( "getSong letter: "); Serial.print(iLetter_); Serial.print(" number: "); Serial.println(iNumber_);
-  if(iLetter_ <= 5 )
+
+  switch (iLetter_)
   {
-    song = "/01 Rough Justice.mp3";
+  case 1:
+    sprintf(song, "A%i", iNumber_);
+    break;
+  case 2:
+    sprintf(song, "B%i", iNumber_);
+    break;
+  case 3:
+    sprintf(song, "C%i", iNumber_);
+    break;
+  case 4:
+    sprintf(song, "D%i", iNumber_);
+    break;
+  case 5:
+    sprintf(song, "E%i", iNumber_);
+    break;
+  case 6:
+    sprintf(song, "F%i", iNumber_);
+    break;
+  case 7:
+    sprintf(song, "G%i", iNumber_);
+    break;
+  case 8:
+    sprintf(song, "H%i", iNumber_);
+    break;
+  case 9:
+    sprintf(song, "J%i", iNumber_);
+    break;
+  case 10:
+    sprintf(song, "K%i", iNumber_);
+    break;
+  default:
+    sprintf(song, "A1");
   }
-  else
-  {
-    song = "/07 She Saw Me Coming.mp3";
-  }
-  return song;
+  Serial.print("Song selected: "); Serial.println(song);
+  return configServer.getElement( song );
+
 }
 
-/* 
-* SETUP 
-*/
+void createSongsJson(FS *fs, const char* filename)
+{
+  char song[3];
+  for (size_t i = 1; i <= 10; i++)
+  {
+    char letter[2];
+    switch (i)
+    {
+    case 1:
+      /* code */
+      sprintf(letter, "A");
+      break;
+    case 2:
+      /* code */
+      sprintf(letter, "B");
+      break;
+    case 3:
+      /* code */
+      sprintf(letter, "C");
+      break;
+    case 4:
+      /* code */
+      sprintf(letter, "D");
+      break;
+    case 5:
+      /* code */
+      sprintf(letter, "E");
+      break;
+    case 6:
+      /* code */
+      sprintf(letter, "F");
+      break;
+    case 7:
+      /* code */
+      sprintf(letter, "G");
+      break;
+    case 8:
+      /* code */
+      sprintf(letter, "H");
+      break;
+    case 9:
+      /* code */
+      sprintf(letter, "J");
+      break;
+    case 10:
+      /* code */
+      sprintf(letter, "K");
+      break;
+    }
+    /* code */
+    for (size_t l = 1; l <= 10; l++)
+    {
+      /* code */
+      sprintf(song, "%s%i", letter, l);
+      Serial.print("song: "); Serial.println(song);
+      configServer.putElement(&song[0], "");
+    }
+  }
+  configServer.saveToConfigfile();
+  configServer.printConfig();
+}
+
+/**
+ * @brief setup() : setup function 
+ */
 void setup() 
 {
   /*-------------------------------------------------------*/
   /* Start serail                                          */
   Serial.begin(115200);
   AudioLogger::instance().begin(Serial, AudioLogger::Warning);  
+  /*-------------------------------------------------------*/
+  /* start filesystem                                      */
+  if(!SPIFFS.begin())
+  {
+      Serial.println("An Error has occurred while mounting SPIFFS\nDid you upload the data directory that came with this example?");
+  }
+  /*-------------------------------------------------------*/
+  /* load songlist                                         */
+  Serial.println("Load /songs.json ...");
+  if( SPIFFS.exists("/songs.json") )
+  {
+    Serial.println("/songs.json exists. Read file...");
+    configServer.loadConfig(&SPIFFS, "/songs.txt", FileFormat::VECTOR);
+  }
+  else
+  {
+    Serial.println("could not load -> create one...");
+    // TODO: Fix support JSON & VECTOR
+    createSongsJson(&SPIFFS, "/songs.json");
+  }
   /*-------------------------------------------------------*/
   /* init INA219                                           */
   Wire.begin(I2C_SDA, I2C_SCL);
@@ -161,6 +279,7 @@ void setup()
     vTaskDelay(2000/portTICK_PERIOD_MS);
   } 
   ina219_letter.setADCMode(SAMPLE_MODE_16); 
+  // ToDo: activate number button
 /*  while(!ina219_number.init())
   {
     Serial.println("INA219_number not connected!");
@@ -241,6 +360,10 @@ boolean activeted2 = false;
 
 void loop() {
   // put your main code here, to run repeatedly:
+#ifdef TEST_BUTNS
+    potValue1 = AdcConvert(&ina219_letter);
+    Serial.print("NUMBER_BTN value:"); Serial.println(potValue1);
+#else
   if(!activated1)
   {
     potValue1 = AdcConvert(&ina219_letter);
@@ -271,9 +394,6 @@ void loop() {
     
     Serial.println( "Entered SENDER-Task, about to SEND to the queue..." );
 
-    TXmy_struct.counter     = potValue1;
-    TXmy_struct.large_value = potValue2;
-
     strcpy(TXmy_struct.str, getSong(potValue1, potValue2).c_str());
 
     /***** send to the queue ****/
@@ -287,7 +407,11 @@ void loop() {
     }
     activated1 = false;
     activeted2 = false;
+    /*-----------------------------------------------------*/
+    /* reload songlist                                     */
+    configServer.loadConfig(&SPIFFS, "/songs.txt", FileFormat::VECTOR);
     vTaskDelay(TickDelay);
   }
+#endif
   vTaskDelay(100/portTICK_PERIOD_MS);
 }

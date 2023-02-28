@@ -4,7 +4,5 @@
 
 /**************** STRUCTURE DEFINITION *****************/
 typedef struct {
-	char str[50];
-	int counter;
-	uint16_t large_value;
+	char str[40];
 } my_struct;
