@@ -17,6 +17,10 @@
 #define I2C_SDA 23
 #define I2C_SCL 22
 
+#define CONFIG_FILE "/config.json"
+#define SONGS_FILE "/songs.txt"
+
+
 TaskHandle_t hTaskWebServer;
 TaskHandle_t hTaskAudioPlayer;
 
@@ -134,9 +138,9 @@ void taskAudioPlayerCode( void * pvParameters )
  * @param  {int} iNumber_ : number of number button (1-10)
  * @return {String}       : full name of song
  */
-String getSong(int iLetter_, int iNumber_)
+std::string getSong(int iLetter_, int iNumber_)
 {
-  char song[3];
+  char song[4];
   Serial.print( "getSong letter: "); Serial.print(iLetter_); Serial.print(" number: "); Serial.println(iNumber_);
 
   switch (iLetter_)
@@ -179,9 +183,10 @@ String getSong(int iLetter_, int iNumber_)
 
 }
 
-void createSongsJson(FS *fs, const char* filename)
+void createSongsMap()
 {
-  char song[3];
+  char song[4];
+  MapConfig mapConfig;
   for (size_t i = 1; i <= 10; i++)
   {
     char letter[2];
@@ -234,10 +239,17 @@ void createSongsJson(FS *fs, const char* filename)
       /* code */
       sprintf(song, "%s%i", letter, l);
       Serial.print("song: "); Serial.println(song);
-      configServer.putElement(&song[0], "");
+      mapConfig[song] = "/07 She Saw Me Coming.mp3";
     }
   }
-  configServer.saveToConfigfile();
+
+  for (auto const& x : mapConfig)
+  {
+    Serial.print(x.first.c_str()); Serial.print(" -> "); Serial.println(x.second.c_str());
+  }
+
+  // savge the map
+  configServer.saveConfig(&mapConfig);
   configServer.printConfig();
 }
 
@@ -258,17 +270,11 @@ void setup()
   }
   /*-------------------------------------------------------*/
   /* load songlist                                         */
-  Serial.println("Load /songs.json ...");
-  if( SPIFFS.exists("/songs.json") )
-  {
-    Serial.println("/songs.json exists. Read file...");
-    configServer.loadConfig(&SPIFFS, "/songs.txt", FileFormat::VECTOR);
-  }
-  else
+  Serial.println("Load "); Serial.print(SONGS_FILE); Serial.print(" ...");
+  if(!configServer.loadConfig(&SPIFFS, SONGS_FILE, FileFormat::MAP) )
   {
     Serial.println("could not load -> create one...");
-    // TODO: Fix support JSON & VECTOR
-    createSongsJson(&SPIFFS, "/songs.json");
+    createSongsMap();
   }
   /*-------------------------------------------------------*/
   /* init INA219                                           */
@@ -409,7 +415,7 @@ void loop() {
     activeted2 = false;
     /*-----------------------------------------------------*/
     /* reload songlist                                     */
-    configServer.loadConfig(&SPIFFS, "/songs.txt", FileFormat::VECTOR);
+    configServer.loadConfig(&SPIFFS, SONGS_FILE, FileFormat::MAP);
     vTaskDelay(TickDelay);
   }
 #endif

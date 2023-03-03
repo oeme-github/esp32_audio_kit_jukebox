@@ -337,8 +337,8 @@ boolean MyWebServer::connectWifi()
 
 boolean MyWebServer::regToMDNS()
 {
-    String host = this->configServer->getElement("host");
-    int port    = this->configServer->getElement("port").toInt();
+    String host = this->configServer->getElement("host").c_str();
+    int port    = std::stoi(this->configServer->getElement("port"));
 
     Serial.print("host :"); Serial.println(host);
     Serial.print("port :"); Serial.println(port);
@@ -367,7 +367,7 @@ boolean MyWebServer::begin()
     Serial.println("MyWebServer::begin()");
     /*-----------------------------------------------------*/
     /* start the web-server                                */
-    int port = this->configServer->getElement("port").toInt();
+    int port = std::stoi(this->configServer->getElement("port"));
     server = new AsyncWebServer(port);
     /*-----------------------------------------------------*/
     /* configure the server                                */
