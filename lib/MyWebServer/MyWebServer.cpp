@@ -1,6 +1,6 @@
 #include "MyWebServer.h"
 
-const char *title = "Jukebox";
+String title = "Jukebox";
 
 /**
  * @brief  humanReadableSize(const size_t bytes)
@@ -343,9 +343,6 @@ boolean MyWebServer::loadConfig()
             this->createConfigJson();
         }
         this->isConfigLoaded = true;
-
-        if( configServer->containsKey("title") )
-            title = this->configServer->getElement("title").c_str();
     }
     return this->isConfigLoaded;
 }
@@ -444,6 +441,8 @@ boolean MyWebServer::begin()
     /* start the web-server                                */
     int port = std::stoi(this->configServer->getElement("port"));
     server = new AsyncWebServer(port);
+
+    title = this->configServer->getElement("title").c_str();
     /*-----------------------------------------------------*/
     /* configure the server                                */
     server->onFileUpload(handleFileUpload);
@@ -453,7 +452,6 @@ boolean MyWebServer::begin()
                 [](AsyncWebServerRequest *request) { request->send(200);}, 
                 handleFileUpload
     );
-
     server->on( "/", 
                 HTTP_GET, 
                 [&](AsyncWebServerRequest *request)
@@ -494,67 +492,7 @@ boolean MyWebServer::begin()
                         return request->requestAuthentication();
                     }
                 }
-            );
-    server->on( "/file", 
-                HTTP_GET, 
-                [&](AsyncWebServerRequest * request) 
-                {
-                    String msg = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
-
-                    this->printAllParams(request);
-                    this->printAllArgs(request);
-
-
-                    if (this->checkWebAuth(request)) 
-                    {
-                        msg += " checkWebAuth: Success";
-                        Serial.println(msg);
-
-                        if( request->hasParam("name") && request->hasParam("action") && request->hasParam("fs") ) 
-                        {
-                            String fsName          = request->getParam("fs")->value();
-                            const char *fileName   = request->getParam("name")->value().c_str();
-                            const char *fileAction = request->getParam("action")->value().c_str();
-                            msg = "Client:" + request->client()->remoteIP().toString() + " " + request->url() + "?name=" + String(fileName) + "&action=" + String(fileAction) + "&fs=" + fsName;
-                            
-                            fs::FS fs = SD;
-                            if( fsName == "SPIFFS" )
-                            {
-                               fs = SPIFFS; 
-                            }
-
-                            if( strcmp(fileAction, "download") == 0 ) 
-                            {
-                                msg += " downloaded";
-                                request->send(fs, fileName, "application/octet-stream");
-                            } 
-                            else 
-                            {
-                                msg += " ERROR: invalid action param supplied";
-                                request->send(400, "text/plain", "ERROR: invalid action param supplied");
-                            }
-                            Serial.println(msg);
-                            
-                        } 
-                        else 
-                        {
-                            if( !request->hasParam("name") )
-                                request->send(400, "text/plain", "ERROR: name required");
-                            if( !request->hasParam("action") ) 
-                                request->send(400, "text/plain", "ERROR: action required");
-                            if( !request->hasParam("fs") )
-                                request->send(400, "text/plain", "ERROR: fs required");
-                        }
-                    } 
-                    else 
-                    {
-                        msg += " Auth: Failed";
-                        Serial.println(msg);
-                        return request->requestAuthentication();
-                    }
-                }
-            );
-
+    );
     server->on( "/file", 
                 HTTP_POST, 
                 [&](AsyncWebServerRequest * request) 
@@ -597,18 +535,21 @@ boolean MyWebServer::begin()
                             else if (fileAction == "play") 
                             {
                                 msg += " started";
-
                                 RetCode retCode = this->sendToAudioPlayer(&fileName);
                                 request->send(retCode.iRet, "text/plain", retCode.msg);
                             } 
+                            else if(fileAction == "download" ) 
+                            {
+                                msg += " downloaded";
+                                request->send(fs, fileName, "application/octet-stream");
+                            }
                             else 
                             {
                                 msg += " ERROR: invalid action param supplied";
                                 request->send(400, "text/plain", "ERROR: invalid action param supplied");
                             }
-                            Serial.println(msg);
-                            
-                        } 
+                            Serial.println(msg);    
+                        }
                         else 
                         {
                             if( !request->hasParam("name") )
@@ -626,9 +567,7 @@ boolean MyWebServer::begin()
                         return request->requestAuthentication();
                     }
                 }
-            );
-
-
+    );
     server->onNotFound( [&](AsyncWebServerRequest *request) 
                         {
                             Serial.println("onNotFound...");
@@ -653,7 +592,6 @@ boolean MyWebServer::begin()
     /*-----------------------------------------------------*/
     /* start web-server                                    */
     server->begin();
-
     return true;
 }
 

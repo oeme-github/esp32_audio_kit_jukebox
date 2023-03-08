@@ -20,7 +20,8 @@
 #define I2C_SCL 22
 
 //#define TEST_RELAIS 100
-#define RELAIS_PIN 18
+#define RELAIS_PIN_1 18
+#define RELAIS_PIN_2 19
 #define RELAIS_EIN HIGH
 #define RELAIS_AUS LOW
 
@@ -359,24 +360,28 @@ void setup()
   vTaskDelay(500/portTICK_PERIOD_MS);
   /*-------------------------------------------------------*/
   /* GPIO                                                  */
-  Serial.print("RELAIS_PIN : "); Serial.println(RELAIS_PIN);
-  pinMode(RELAIS_PIN, OUTPUT);
+  Serial.print("RELAIS_PIN_1 : "); Serial.println(RELAIS_PIN_1);
+  pinMode(RELAIS_PIN_1, OUTPUT);
+  Serial.print("RELAIS_PIN_2 : "); Serial.println(RELAIS_PIN_2);
+  pinMode(RELAIS_PIN_2, OUTPUT);
 #ifdef TEST_RELAIS
   Serial.print("TEST_RELAIS: "); Serial.println(TEST_RELAIS);
   for (size_t i = 0; i < TEST_RELAIS; i++)
   {
-    /* code */
     Serial.println("-> RELAIS_AUS");
-    digitalWrite(RELAIS_PIN, RELAIS_AUS);
+    digitalWrite(RELAIS_PIN_1, RELAIS_AUS);
+    digitalWrite(RELAIS_PIN_2, RELAIS_AUS);
     vTaskDelay(1000/portTICK_PERIOD_MS);
     Serial.println("-> RELAIS_EIN");
-    digitalWrite(RELAIS_PIN, RELAIS_EIN);
+    digitalWrite(RELAIS_PIN_1, RELAIS_EIN);
+    digitalWrite(RELAIS_PIN_2, RELAIS_EIN);
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
 #endif
   /*-------------------------------------------------------*/
   /* default is RELAIS_AUS (LOW)                           */
-  digitalWrite(RELAIS_PIN, RELAIS_AUS);
+  digitalWrite(RELAIS_PIN_1, RELAIS_AUS);
+  digitalWrite(RELAIS_PIN_2, RELAIS_AUS);
   /*-------------------------------------------------------*/
   /* just wait a while                                     */
   vTaskDelay(500/portTICK_PERIOD_MS);
@@ -400,7 +405,9 @@ void loop() {
   {
     /*-----------------------------------------------------*/
     potValue1 = AdcConvert(&ina219_letter);
+#ifdef TEST_BUTNS
     Serial.print("NUMBER_BTN value:"); Serial.println(potValue1);
+#endif
     if( potValue1 > 0 )
     {
       activated1 = true;
@@ -413,13 +420,14 @@ void loop() {
   if(activated1 & !activeted2)
   {
     potValue2 = AdcConvert(&ina219_letter);
+#ifdef TEST_BUTNS
     Serial.print("LETTER_BTN value:"); Serial.println(potValue2);
+#endif
     if( potValue2 > 0 )
     {
       /*---------------------------------------------------*/
       /* hold buttons                                      */
-      Serial.println("--> Hold btn (RELAIS_EIN).");
-      digitalWrite(RELAIS_PIN, RELAIS_EIN);
+      digitalWrite(RELAIS_PIN_1, RELAIS_EIN);
       activeted2 = true;
     }
   }
@@ -430,15 +438,16 @@ void loop() {
     /*----------------------------------------------------*/
     /* setup the queue                                    */
     my_struct TXmy_struct;
-   
+#ifdef TEST_BUTNS   
     Serial.println( "Entered SENDER-Task, about to SEND to the queue..." );
-
+#endif
     strcpy(TXmy_struct.str, getSong(potValue1, potValue2).c_str());
-
     /***** send to the queue ****/
     if (xQueueSend(hQueue_global, (void *)&TXmy_struct, portMAX_DELAY) == pdPASS)
     {
+#ifdef TEST_BUTNS      
         Serial.print( "--> filename "); Serial.print(TXmy_struct.str); Serial.println(" sended" );
+#endif
     }
     else
     {
@@ -452,8 +461,10 @@ void loop() {
     vTaskDelay(2000/portTICK_PERIOD_MS);
     /*-----------------------------------------------------*/
     /* release buttons                                     */
-    Serial.println("--> release btn (RELAIS_AUS).");
-    digitalWrite(RELAIS_PIN, RELAIS_AUS);
+    digitalWrite(RELAIS_PIN_1, RELAIS_AUS);
+    digitalWrite(RELAIS_PIN_2, RELAIS_EIN);
+    vTaskDelay(500/portTICK_PERIOD_MS);
+    digitalWrite(RELAIS_PIN_2, RELAIS_AUS);
   }
 #endif
   vTaskDelay(100/portTICK_PERIOD_MS);

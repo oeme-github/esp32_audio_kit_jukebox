@@ -37,9 +37,10 @@ int AdcConvert(INA219_WE *ina219_)
   int iCounter  = 100;
 
   int current_mA = ina219_->getCurrent_mA();
-
+#ifdef TEST_BUTNS
   Serial.print("current_mA : "); Serial.println(current_mA);
   vTaskDelay(1000/portTICK_PERIOD_MS);
+#endif
   /*-------------------------------------------------------*/
   /* debouncing the measurement                            */
   while( true )

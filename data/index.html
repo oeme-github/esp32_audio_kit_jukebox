@@ -189,7 +189,7 @@
         function loadDownload(path)
         {
           console.log("loadDownload("+path+")");
-          document.getElementById('download-frame').src = path+"?download=true";
+          document.getElementById('download-frame').src = "file/?action=download&fs="+getSelectedFS()+"&name="+path;
         }
   
         function playAudio(path)
