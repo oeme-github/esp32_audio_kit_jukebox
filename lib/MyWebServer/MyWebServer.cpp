@@ -2,6 +2,12 @@
 
 const char *title = "Jukebox";
 
+/**
+ * @brief  humanReadableSize(const size_t bytes)
+ * @note   returns a Sting with humanreadable size of memory
+ * @param  bytes: const size 
+ * @retval String
+ */
 String humanReadableSize(const size_t bytes) 
 {
     if (bytes < 1024) 
@@ -14,6 +20,12 @@ String humanReadableSize(const size_t bytes)
         return String(bytes / 1024.0 / 1024.0 / 1024.0) + " GB";
 }
 
+/**
+ * @brief  processor(const String& var)
+ * @note   returns a String to a given const String& var
+ * @param  var: const String& reference
+ * @retval String
+ */
 String processor(const String& var) 
 {
     Serial.print("processor("); Serial.print(var); Serial.println(")");
@@ -56,8 +68,14 @@ String processor(const String& var)
     return retString;
 }
 
-
-RetCode listFiles(AsyncWebServerRequest * request) {
+/**
+ * @brief  listFiles(AsyncWebServerRequest * request)
+ * @note   returns html code and integer
+ * @param  request: pointer to AsyncWebServerRequest
+ * @retval RetCode.msg - Text, RetCode.iRet - Errorcode 
+ */
+RetCode listFiles(AsyncWebServerRequest * request) 
+{
     Serial.println("listFiles()");
 
     int args = request->args();
@@ -172,6 +190,17 @@ RetCode listFiles(AsyncWebServerRequest * request) {
     return retCode;
 }
 
+/**
+ * @brief  handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) 
+ * @note   handler for file upload
+ * @param  *request: AsyncWebServerRequest
+ * @param  filename: String
+ * @param  index: size_t
+ * @param  *data: uint8_t
+ * @param  len: size_t
+ * @param  final: bool
+ * @retval None
+ */
 void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) 
 {
     Serial.println("handleFileUpload()");
@@ -226,14 +255,29 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t in
     }
  }
 
+/**
+ * @brief  MyWebServer() constructor
+ * @note   
+ * @retval 
+ */
 MyWebServer::MyWebServer()
 {
 }
 
+/**
+ * @brief  MyWebServer() destructor
+ * @note   
+ * @retval 
+ */
 MyWebServer::~MyWebServer()
 {
 }
 
+/**
+ * @brief  startWebServer()
+ * @note   startup for webserver -> loading config, connect to wifi, start webserver, register to MDNS
+ * @retval None
+ */
 void MyWebServer::startWebServer()
 {
     /*-----------------------------------------------------*/
@@ -274,6 +318,11 @@ void MyWebServer::startWebServer()
     }
 }
 
+/**
+ * @brief  loadConfig()
+ * @note   creats a MyConfigServer and loads the config file
+ * @retval true|false
+ */
 boolean MyWebServer::loadConfig()
 {
     Serial.println("loadConfig()");
@@ -301,6 +350,12 @@ boolean MyWebServer::loadConfig()
     return this->isConfigLoaded;
 }
 
+/**
+ * @brief  loadSD(fs::FS *fs_)
+ * @note   checks if SD is mounted
+ * @param  *fs_: 
+ * @retval true|false
+ */
 boolean MyWebServer::loadSD(fs::FS *fs_)
 {
     // FS storage
@@ -320,11 +375,21 @@ boolean MyWebServer::loadSD(fs::FS *fs_)
     return true;
 }
 
+/**
+ * @brief  resetWifi()
+ * @note   calls resetSettings() from the WifiManager
+ * @retval None
+ */
 void MyWebServer::resetWifi()
 {
     this->wm.resetSettings();
 }
 
+/**
+ * @brief  connectWifi()
+ * @note   calls the autoConnect() from the WifiManager
+ * @retval true|false
+ */
 boolean MyWebServer::connectWifi()
 {
     // Automatically connect using saved credentials,
@@ -335,6 +400,11 @@ boolean MyWebServer::connectWifi()
 
 }
 
+/**
+ * @brief  regToMDNS()
+ * @note   registers the webserver with its name to MDNS
+ * @retval true|false
+ */
 boolean MyWebServer::regToMDNS()
 {
     String host = this->configServer->getElement("host").c_str();
@@ -362,6 +432,11 @@ boolean MyWebServer::regToMDNS()
     return this->isRegToMDNS;
 }
 
+/**
+ * @brief  begin()
+ * @note   starts the webserver services
+ * @retval true|false
+ */
 boolean MyWebServer::begin()
 {
     Serial.println("MyWebServer::begin()");
@@ -582,6 +657,12 @@ boolean MyWebServer::begin()
     return true;
 }
 
+/**
+ * @brief  checkWebAuth(AsyncWebServerRequest * request) 
+ * @note   check if the user is authenticated
+ * @param  request: pointer to AsyncWebServerRequest
+ * @retval 
+ */
 bool MyWebServer::checkWebAuth(AsyncWebServerRequest * request) 
 {
     bool isAuthenticated = false;
@@ -593,7 +674,12 @@ bool MyWebServer::checkWebAuth(AsyncWebServerRequest * request)
     return isAuthenticated;
 }
 
-
+/**
+ * @brief  loadFromFS(AsyncWebServerRequest *request)
+ * @note   loads file from filesystem and sends it to the browser
+ * @param  *request: pointer to AsyncWebServerRequest
+ * @retval true|false
+ */
 bool MyWebServer::loadFromFS(AsyncWebServerRequest *request) 
 {
     Serial.println("loadFromFS()");
@@ -658,6 +744,12 @@ bool MyWebServer::loadFromFS(AsyncWebServerRequest *request)
     return true;
 }
 
+/**
+ * @brief  printAllParams(AsyncWebServerRequest *request)
+ * @note   debug function, prints request parameters
+ * @param  *request: pointer to AsyncWebServerRequest
+ * @retval None
+ */
 void MyWebServer::printAllParams(AsyncWebServerRequest *request)
 {
     Serial.println("printAllParams()");
@@ -682,6 +774,12 @@ void MyWebServer::printAllParams(AsyncWebServerRequest *request)
     }    
 }
 
+/**
+ * @brief  printAllArgs(AsyncWebServerRequest *request)
+ * @note   debug function, prints request args
+ * @param  *request: pointer to AsyncWebServerRequest
+ * @retval None
+ */
 void MyWebServer::printAllArgs(AsyncWebServerRequest *request)
 {
     Serial.println("printAllArgs()");
@@ -693,7 +791,13 @@ void MyWebServer::printAllArgs(AsyncWebServerRequest *request)
     }
 }
 
-
+/**
+ * @brief  deleteRecursive(fs::FS *fs_, String path)
+ * @note   function to delete files / directories
+ * @param  *fs_: 
+ * @param  path: 
+ * @retval RetCode.msg - text, RetCode.iRet - errorcode 
+ */
 RetCode MyWebServer::deleteRecursive(fs::FS *fs_, String path) 
 {
     RetCode retCode;
@@ -740,6 +844,13 @@ RetCode MyWebServer::deleteRecursive(fs::FS *fs_, String path)
     return retCode;
 }
 
+/**
+ * @brief  createDir(fs::FS *fs_, String path)
+ * @note   creats a directory
+ * @param  *fs_: pointer to filesystem
+ * @param  path: String
+ * @retval RetCode.msg - text, RetCode.iRet - errorcode
+ */
 RetCode MyWebServer::createDir(fs::FS *fs_, String path)
 {
     Serial.print("createDir("); Serial.print(path); Serial.println(")");
@@ -766,28 +877,34 @@ RetCode MyWebServer::createDir(fs::FS *fs_, String path)
     return retCode;
 }
 
-
+/**
+ * @brief  setQueueAudioPlayer(xQueueHandle hQueueAudioPlayer_)
+ * @note   setter function for member hQueueAudioPlayer
+ * @param  hQueueAudioPlayer_: 
+ * @retval None
+ */
 void MyWebServer::setQueueAudioPlayer(xQueueHandle hQueueAudioPlayer_)
 {
     this->hQueueAudioPlayer = hQueueAudioPlayer_;
-
 }
 
+/**
+ * @brief  sendToAudioPlayer(String *fileName)
+ * @note   sends audiofilename to audioqueue
+ * @param  *fileName: 
+ * @retval RetCode.msg - text, RetCode.iRet - errorcode
+ */
 RetCode MyWebServer::sendToAudioPlayer(String *fileName)
 {
     Serial.print("sendToAudioPlayer("); Serial.print(fileName->c_str()); Serial.println(")");
-
     /*----------------------------------------------------*/
     /* setup the queue                                    */
     my_struct TXmy_struct;
 	uint32_t TickDelay = pdMS_TO_TICKS(2000);
     RetCode retCode;
-    
     Serial.println( "Entered SENDER-Task\n about to SEND to the queue\n\n" );
-
     /********** LOAD THE DATA ***********/
     strcpy(TXmy_struct.str, fileName->c_str());
-
     /***** send to the queue ****/
     if (xQueueSend(this->hQueueAudioPlayer, (void *)&TXmy_struct, portMAX_DELAY) == pdPASS)
     {
@@ -802,10 +919,13 @@ RetCode MyWebServer::sendToAudioPlayer(String *fileName)
     Serial.println( retCode.msg );
     vTaskDelay(TickDelay);
     return retCode;
-
 }
 
-
+/**
+ * @brief  createConfigJson()
+ * @note   creates the json config and saves it to file (config.json)
+ * @retval None
+ */
 void MyWebServer::createConfigJson()
 {
     this->configServer->putElement("version", "v0.0.1"           );

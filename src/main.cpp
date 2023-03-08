@@ -12,6 +12,8 @@
 #include <Wire.h>
 #include <INA219_WE.h>
 
+/*---------------------------------------------------------*/
+/* defines                                                 */
 #define I2C_ADDRESS_LETTER 0x40
 #define I2C_ADDRESS_NUMBER 0x41
 #define I2C_SDA 23
@@ -26,6 +28,8 @@
 #define CONFIG_FILE "/config.json"
 #define SONGS_FILE "/songs.txt"
 
+/*---------------------------------------------------------*/
+/* global varaibles                                        */
 TaskHandle_t hTaskWebServer;
 TaskHandle_t hTaskAudioPlayer;
 
@@ -45,13 +49,19 @@ MyConfigServer configServer;
 INA219_WE ina219_letter = INA219_WE(I2C_ADDRESS_LETTER);
 INA219_WE ina219_number = INA219_WE(I2C_ADDRESS_NUMBER);
 
+int potValue1 = 0;
+int potValue2 = 0;
+boolean activated1 = false;
+boolean activeted2 = false;
+
 int indx1 = 0;
 xQueueHandle hQueue_global;
 
 /**
- * @brief htaskWebServerCode()
- * 
- * @param pvParameters 
+ * @brief  taskWebServerCode() 
+ * @note   ist started during setup()
+ * @param  pvParameters: 
+ * @retval None
  */
 void taskWebServerCode( void * pvParameters )
 {
@@ -70,9 +80,10 @@ void taskWebServerCode( void * pvParameters )
 }
 
 /**
- * @brief htaskAudioPlayerCode()
- * 
- * @param pvParameters 
+ * @brief  taskAudioPlayerCode() 
+ * @note   ist started during setup()
+ * @param  pvParameters: 
+ * @retval None
  */
 void taskAudioPlayerCode( void * pvParameters )
 {
@@ -179,6 +190,11 @@ std::string getSong(int iLetter_, int iNumber_)
   return configServer.getElement( song );
 }
 
+/**
+ * @brief createSongMap() creats the songs.txt file 
+ * @note  is called when no songs.txt is pressent
+ * @retval None
+ */
 void createSongsMap()
 {
   char song[4];
@@ -239,7 +255,9 @@ void createSongsMap()
 }
 
 /**
- * @brief setup() : setup function 
+ * @brief  setup()
+ * @note   is processed once during startup 
+ * @retval None
  */
 void setup() 
 {
@@ -364,14 +382,12 @@ void setup()
   vTaskDelay(500/portTICK_PERIOD_MS);
 }
 
-/*
-* LOOP
-*/
-int potValue1 = 0;
-int potValue2 = 0;
-boolean activated1 = false;
-boolean activeted2 = false;
-
+/**
+ * @brief  loop()
+ * @note   continues processing on core 0
+ * @note   -> checkinf song-selection
+ * @retval None
+ */
 void loop() {
   // put your main code here, to run repeatedly:
 #ifdef TEST_BUTNS
