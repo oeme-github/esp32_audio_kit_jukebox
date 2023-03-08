@@ -2,7 +2,7 @@
 
 #include <INA219_WE.h>
 
-//#define TEST_BUTNS 1
+//#define TEST_BUTNS
 
 /*---------------------------------------------------------*/
 /* we need to reed the input                               */
@@ -10,15 +10,13 @@
 /* and buttons with letters from A to K (without I)        */
 /*---------------------------------------------------------*/
 /*
-                      no
-                    resistor
- +3V3 --[ina219]---[100]---+--[10]--+--[20]--+--[30]--+--[40]--+--[50]--+--[60]--+--[70]--+--[80]--+--[90]--+
-           |               |        |        |        |        |        |        |        |        |        |
-           |              / 1      / 2      / 3      / 4      / 5      / 6      / 7      / 8      / 9      / 10 
-           |               |        |        |        |        |        |        |        |        |        | 
-           +---------------+--------+--------+--------+--------+--------+--------+--------+--------+--------+----> to GND
 
-                         >420     >=380    >=320    >=260    >=200    >=190
+ +3V3 --[ina219]---[100]---+--[10]--+--[22]--+--[47]--+--[62]--+--[82]--+--[100]--+--[150]--+--[330]--+--[470]--+
+           |               |        |        |        |        |        |         |         |         |         |
+           |              / 1      / 2      / 3      / 4      / 5      / 6       / 7       / 8       / 9       / 10    Buttons
+           |               |        |        |        |        |        |         |         |         |         | 
+           +---------------+--------+--------+--------+--------+--------+---------+---------+---------+---------+----> to GND
+
 
     -> you neet do measure the values and use yours!!!
 * This function is inspired by https://github.com/Frank-Bemelman. *    
@@ -38,6 +36,10 @@ int AdcConvert(INA219_WE *ina219_)
   int potValue_ = 0;
   int iCounter  = 100;
 
+  int current_mA = ina219_->getCurrent_mA();
+
+  Serial.print("current_mA : "); Serial.println(current_mA);
+  vTaskDelay(1000/portTICK_PERIOD_MS);
   /*-------------------------------------------------------*/
   /* debouncing the measurement                            */
   while( true )
@@ -69,20 +71,20 @@ int AdcConvert(INA219_WE *ina219_)
 
 #ifdef TEST_BUTNS
   Serial.print("Result  : "); Serial.println(potValue);
+  vTaskDelay(1000/portTICK_PERIOD_MS);
   return potValue;
 #else
   if( potValue <= 0  ) return 0;   // no key pressed
-  if( potValue > 420 ) return 1;
-  if( potValue > 380 ) return 2;
-  if( potValue > 320 ) return 3;
-  if( potValue > 260 ) return 4;
-  if( potValue > 200 ) return 5;
-  if( potValue > 190 ) return 6;
-  if( potValue > 170 ) return 7;
-  if( potValue > 140 ) return 8;
-  if( potValue > 100 ) return 9;
-  if( potValue > 50 ) return 10;
-
+  if( potValue > 420 ) return 10;
+  if( potValue > 380 ) return 9;
+  if( potValue > 320 ) return 8;
+  if( potValue > 220 ) return 7;
+  if( potValue > 170 ) return 6;
+  if( potValue > 130 ) return 5;
+  if( potValue > 100 ) return 4;
+  if( potValue >  70 ) return 3;
+  if( potValue >  40 ) return 2;
+  if( potValue >  30 ) return 1;
   return -1;  // error
 #endif
 }

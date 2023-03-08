@@ -17,9 +17,14 @@
 #define I2C_SDA 23
 #define I2C_SCL 22
 
+//#define TEST_RELAIS 100
+#define RELAIS_PIN 18
+#define RELAIS_EIN HIGH
+#define RELAIS_AUS LOW
+
+//#define DEBUG_MAP
 #define CONFIG_FILE "/config.json"
 #define SONGS_FILE "/songs.txt"
-
 
 TaskHandle_t hTaskWebServer;
 TaskHandle_t hTaskAudioPlayer;
@@ -37,12 +42,6 @@ LogarithmicVolumeControl lvc;
 
 MyConfigServer configServer;
 
-/* There are several ways to create your INA219 object:
- * INA219_WE ina219 = INA219_WE(); -> uses Wire / I2C Address = 0x40
- * INA219_WE ina219 = INA219_WE(I2C_ADDRESS); -> uses Wire / I2C_ADDRESS
- * INA219_WE ina219 = INA219_WE(&Wire); -> you can pass any TwoWire object
- * INA219_WE ina219 = INA219_WE(&Wire, I2C_ADDRESS); -> all together
- */
 INA219_WE ina219_letter = INA219_WE(I2C_ADDRESS_LETTER);
 INA219_WE ina219_number = INA219_WE(I2C_ADDRESS_NUMBER);
 
@@ -68,9 +67,7 @@ void taskWebServerCode( void * pvParameters )
   {
     vTaskDelay(100/portTICK_PERIOD_MS);
   }
-
 }
-
 
 /**
  * @brief htaskAudioPlayerCode()
@@ -180,7 +177,6 @@ std::string getSong(int iLetter_, int iNumber_)
   }
   Serial.print("Song selected: "); Serial.println(song);
   return configServer.getElement( song );
-
 }
 
 void createSongsMap()
@@ -193,62 +189,51 @@ void createSongsMap()
     switch (i)
     {
     case 1:
-      /* code */
       sprintf(letter, "A");
       break;
     case 2:
-      /* code */
       sprintf(letter, "B");
       break;
     case 3:
-      /* code */
       sprintf(letter, "C");
       break;
     case 4:
-      /* code */
       sprintf(letter, "D");
       break;
     case 5:
-      /* code */
       sprintf(letter, "E");
       break;
     case 6:
-      /* code */
       sprintf(letter, "F");
       break;
     case 7:
-      /* code */
       sprintf(letter, "G");
       break;
     case 8:
-      /* code */
       sprintf(letter, "H");
       break;
     case 9:
-      /* code */
       sprintf(letter, "J");
       break;
     case 10:
-      /* code */
       sprintf(letter, "K");
       break;
     }
-    /* code */
     for (size_t l = 1; l <= 10; l++)
     {
-      /* code */
       sprintf(song, "%s%i", letter, l);
       Serial.print("song: "); Serial.println(song);
       mapConfig[song] = "/07 She Saw Me Coming.mp3";
     }
   }
-
+#ifdef DEBUG_MAP
   for (auto const& x : mapConfig)
   {
     Serial.print(x.first.c_str()); Serial.print(" -> "); Serial.println(x.second.c_str());
   }
-
-  // savge the map
+#endif
+  /*-------------------------------------------------------*/
+  /* savge the map                                         */
   configServer.saveConfig(&mapConfig);
   configServer.printConfig();
 }
@@ -261,7 +246,7 @@ void setup()
   /*-------------------------------------------------------*/
   /* Start serail                                          */
   Serial.begin(115200);
-  AudioLogger::instance().begin(Serial, AudioLogger::Warning);  
+  AudioLogger::instance().begin(Serial, AudioLogger::Warning);
   /*-------------------------------------------------------*/
   /* start filesystem                                      */
   if(!SPIFFS.begin())
@@ -285,6 +270,7 @@ void setup()
     vTaskDelay(2000/portTICK_PERIOD_MS);
   } 
   ina219_letter.setADCMode(SAMPLE_MODE_16); 
+  ina219_letter.setPGain(PG_80);
   // ToDo: activate number button
 /*  while(!ina219_number.init())
   {
@@ -324,35 +310,57 @@ void setup()
       Serial.println("Card Mount Success");
       server.loadSD(&SD);
   }
-  /* -------------------------------------------------- */
-  /* just wait a while                                  */
+  /*-------------------------------------------------------*/
+  /* just wait a while                                     */
   vTaskDelay(100/portTICK_PERIOD_MS);
-  /* -------------------------------------------------- */
-  /* start web-server                                   */
+  /*-------------------------------------------------------*/
+  /* start web-server                                      */
   xTaskCreatePinnedToCore(
-                taskWebServerCode,        /* Task function. */
+                taskWebServerCode,        /* Task function.*/
                 "TaskWebServer",          /* name of task. */
                 4096,                     /* Stack size of task */
                 NULL,                     /* parameter of the task */
                 2,                        /* priority of the task */
                 &hTaskWebServer,          /* Task handle to keep track of created task */
                 1);                       /* pin task to core 0 */                    
-  /* -------------------------------------------------- */
-  /* just wait a while                                  */
+  /*-------------------------------------------------------*/
+  /* just wait a while                                     */
   vTaskDelay(200/portTICK_PERIOD_MS);
-
-  /* -------------------------------------------------- */
-  /* start audioplayer                                  */
+  /*-------------------------------------------------------*/
+  /* start audioplayer                                     */
   xTaskCreatePinnedToCore(
-                taskAudioPlayerCode,      /* Task function. */
+                taskAudioPlayerCode,      /* Task function.*/
                 "TaskAudioPlayer",        /* name of task. */
                 4096,                     /* Stack size of task */
                 NULL,                     /* parameter of the task */
                 1,                        /* priority of the task */
                 &hTaskAudioPlayer,        /* Task handle to keep track of created task */
                 0);                       /* pin task to core 0 */                    
-  /* -------------------------------------------------- */
-  /* just wait a while                                  */
+  /*-------------------------------------------------------*/
+  /* just wait a while                                     */
+  vTaskDelay(500/portTICK_PERIOD_MS);
+  /*-------------------------------------------------------*/
+  /* GPIO                                                  */
+  Serial.print("RELAIS_PIN : "); Serial.println(RELAIS_PIN);
+  pinMode(RELAIS_PIN, OUTPUT);
+#ifdef TEST_RELAIS
+  Serial.print("TEST_RELAIS: "); Serial.println(TEST_RELAIS);
+  for (size_t i = 0; i < TEST_RELAIS; i++)
+  {
+    /* code */
+    Serial.println("-> RELAIS_AUS");
+    digitalWrite(RELAIS_PIN, RELAIS_AUS);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+    Serial.println("-> RELAIS_EIN");
+    digitalWrite(RELAIS_PIN, RELAIS_EIN);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+  }
+#endif
+  /*-------------------------------------------------------*/
+  /* default is RELAIS_AUS (LOW)                           */
+  digitalWrite(RELAIS_PIN, RELAIS_AUS);
+  /*-------------------------------------------------------*/
+  /* just wait a while                                     */
   vTaskDelay(500/portTICK_PERIOD_MS);
 }
 
@@ -370,8 +378,11 @@ void loop() {
     potValue1 = AdcConvert(&ina219_letter);
     Serial.print("NUMBER_BTN value:"); Serial.println(potValue1);
 #else
+  /*-------------------------------------------------------*/
+  /* check NUMBER button                                   */
   if(!activated1)
   {
+    /*-----------------------------------------------------*/
     potValue1 = AdcConvert(&ina219_letter);
     Serial.print("NUMBER_BTN value:"); Serial.println(potValue1);
     if( potValue1 > 0 )
@@ -381,23 +392,29 @@ void loop() {
     }
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
+  /*-------------------------------------------------------*/
+  /* check LETTER btn only if NUMBER btn is aktivated      */
   if(activated1 & !activeted2)
   {
     potValue2 = AdcConvert(&ina219_letter);
     Serial.print("LETTER_BTN value:"); Serial.println(potValue2);
     if( potValue2 > 0 )
     {
+      /*---------------------------------------------------*/
+      /* hold buttons                                      */
+      Serial.println("--> Hold btn (RELAIS_EIN).");
+      digitalWrite(RELAIS_PIN, RELAIS_EIN);
       activeted2 = true;
     }
   }
-
+  /*-------------------------------------------------------*/
+  /* if we have a valid song selection play the song       */
   if( activated1 && activeted2 )
   {
     /*----------------------------------------------------*/
     /* setup the queue                                    */
     my_struct TXmy_struct;
-	  uint32_t TickDelay = pdMS_TO_TICKS(2000);
-    
+   
     Serial.println( "Entered SENDER-Task, about to SEND to the queue..." );
 
     strcpy(TXmy_struct.str, getSong(potValue1, potValue2).c_str());
@@ -405,18 +422,22 @@ void loop() {
     /***** send to the queue ****/
     if (xQueueSend(hQueue_global, (void *)&TXmy_struct, portMAX_DELAY) == pdPASS)
     {
-        Serial.println( "--> filename sended" );
+        Serial.print( "--> filename "); Serial.print(TXmy_struct.str); Serial.println(" sended" );
     }
     else
     {
-        Serial.println( "ERROR: sending filename" );
+        Serial.print( "ERROR: sending " ); Serial.print(TXmy_struct.str);
     }
     activated1 = false;
     activeted2 = false;
     /*-----------------------------------------------------*/
     /* reload songlist                                     */
     configServer.loadConfig(&SPIFFS, SONGS_FILE, FileFormat::MAP);
-    vTaskDelay(TickDelay);
+    vTaskDelay(2000/portTICK_PERIOD_MS);
+    /*-----------------------------------------------------*/
+    /* release buttons                                     */
+    Serial.println("--> release btn (RELAIS_AUS).");
+    digitalWrite(RELAIS_PIN, RELAIS_AUS);
   }
 #endif
   vTaskDelay(100/portTICK_PERIOD_MS);

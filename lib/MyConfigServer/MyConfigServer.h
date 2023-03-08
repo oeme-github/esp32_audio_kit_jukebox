@@ -6,8 +6,7 @@
 #include <vector>
 #include <map>
 
-
-#define DEBUG 1
+//#define DEBUG 1
 
 #define FIRMWARE_VERSION "v0.0.1"
 #define CONFIG_JSON_SIZE 512
