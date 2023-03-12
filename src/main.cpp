@@ -58,6 +58,8 @@ boolean activeted2 = false;
 int indx1 = 0;
 xQueueHandle hQueue_global;
 
+int iResetCounter = 0;
+
 /**
  * @brief  taskWebServerCode() 
  * @note   ist started during setup()
@@ -290,14 +292,13 @@ void setup()
   } 
   ina219_letter.setADCMode(SAMPLE_MODE_16); 
   ina219_letter.setPGain(PG_80);
-  // ToDo: activate number button
-/*  while(!ina219_number.init())
+  while(!ina219_number.init())
   {
     Serial.println("INA219_number not connected!");
     vTaskDelay(2000/portTICK_PERIOD_MS);
   }
   ina219_number.setADCMode(SAMPLE_MODE_16); 
-*/  
+  ina219_number.setPGain(PG_80);
   /*-------------------------------------------------------*/
   /* create QUEUE                                          */
   hQueue_global = xQueueCreate(QUEUE_SIZE, sizeof (my_struct));
@@ -397,7 +398,7 @@ void loop() {
   // put your main code here, to run repeatedly:
 #ifdef TEST_BUTNS
     potValue1 = AdcConvert(&ina219_letter);
-    Serial.print("NUMBER_BTN value:"); Serial.println(potValue1);
+    Serial.print("NUMBER_BTN value:");   Serial.println(potValue1);
 #else
   /*-------------------------------------------------------*/
   /* check NUMBER button                                   */
@@ -411,6 +412,7 @@ void loop() {
     if( potValue1 > 0 )
     {
       activated1 = true;
+      digitalWrite(RELAIS_PIN_1, RELAIS_EIN);
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     vTaskDelay(1000/portTICK_PERIOD_MS);
@@ -419,9 +421,10 @@ void loop() {
   /* check LETTER btn only if NUMBER btn is aktivated      */
   if(activated1 & !activeted2)
   {
-    potValue2 = AdcConvert(&ina219_letter);
+    iResetCounter = iResetCounter++;
+    potValue2 = AdcConvert(&ina219_number);
 #ifdef TEST_BUTNS
-    Serial.print("LETTER_BTN value:"); Serial.println(potValue2);
+    Serial.print("NUMBER_BTN value:"); Serial.println(potValue2);
 #endif
     if( potValue2 > 0 )
     {
@@ -453,18 +456,25 @@ void loop() {
     {
         Serial.print( "ERROR: sending " ); Serial.print(TXmy_struct.str);
     }
-    activated1 = false;
-    activeted2 = false;
+    /*----------------------------------------------------*/
+    /* reset                                              */
+    activated1    = false;
+    activeted2    = false;
+    iResetCounter = 100;
     /*-----------------------------------------------------*/
     /* reload songlist                                     */
     configServer.loadConfig(&SPIFFS, SONGS_FILE, FileFormat::MAP);
     vTaskDelay(2000/portTICK_PERIOD_MS);
+  }
+  if( iResetCounter >= 100 )
+  {
     /*-----------------------------------------------------*/
     /* release buttons                                     */
     digitalWrite(RELAIS_PIN_1, RELAIS_AUS);
     digitalWrite(RELAIS_PIN_2, RELAIS_EIN);
     vTaskDelay(500/portTICK_PERIOD_MS);
     digitalWrite(RELAIS_PIN_2, RELAIS_AUS);
+    iResetCounter = 0;
   }
 #endif
   vTaskDelay(100/portTICK_PERIOD_MS);
