@@ -421,7 +421,7 @@ void loop() {
   /* check LETTER btn only if NUMBER btn is aktivated      */
   if(activated1 & !activeted2)
   {
-    iResetCounter = iResetCounter++;
+    iResetCounter++;
     potValue2 = AdcConvert(&ina219_number);
 #ifdef TEST_BUTNS
     Serial.print("NUMBER_BTN value:"); Serial.println(potValue2);
@@ -466,6 +466,9 @@ void loop() {
     configServer.loadConfig(&SPIFFS, SONGS_FILE, FileFormat::MAP);
     vTaskDelay(2000/portTICK_PERIOD_MS);
   }
+#ifdef TEST_BUTNS      
+  Serial.print("iResetCounter :"); Serial.println(iResetCounter);  
+#endif
   if( iResetCounter >= 100 )
   {
     /*-----------------------------------------------------*/
@@ -474,6 +477,8 @@ void loop() {
     digitalWrite(RELAIS_PIN_2, RELAIS_EIN);
     vTaskDelay(500/portTICK_PERIOD_MS);
     digitalWrite(RELAIS_PIN_2, RELAIS_AUS);
+    activated1 = false;
+    activeted2 = false;
     iResetCounter = 0;
   }
 #endif
