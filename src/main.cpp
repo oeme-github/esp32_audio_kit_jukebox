@@ -340,9 +340,9 @@ void setup()
                 "TaskWebServer",          /* name of task. */
                 4096,                     /* Stack size of task */
                 NULL,                     /* parameter of the task */
-                2,                        /* priority of the task */
+                5,                        /* priority of the task */
                 &hTaskWebServer,          /* Task handle to keep track of created task */
-                1);                       /* pin task to core 0 */                    
+                0);                       /* pin task to core 0 */                    
   /*-------------------------------------------------------*/
   /* just wait a while                                     */
   vTaskDelay(200/portTICK_PERIOD_MS);
@@ -353,9 +353,9 @@ void setup()
                 "TaskAudioPlayer",        /* name of task. */
                 4096,                     /* Stack size of task */
                 NULL,                     /* parameter of the task */
-                1,                        /* priority of the task */
+                2 | portPRIVILEGE_BIT,    /* priority of the task */
                 &hTaskAudioPlayer,        /* Task handle to keep track of created task */
-                0);                       /* pin task to core 0 */                    
+                1);                       /* pin task to core 0 */                    
   /*-------------------------------------------------------*/
   /* just wait a while                                     */
   vTaskDelay(500/portTICK_PERIOD_MS);
@@ -413,7 +413,6 @@ void loop() {
     {
       activated1 = true;
       digitalWrite(RELAIS_PIN_1, RELAIS_EIN);
-      vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
@@ -464,7 +463,7 @@ void loop() {
     /*-----------------------------------------------------*/
     /* reload songlist                                     */
     configServer.loadConfig(&SPIFFS, SONGS_FILE, FileFormat::MAP);
-    vTaskDelay(2000/portTICK_PERIOD_MS);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
   }
 #ifdef TEST_BUTNS      
   Serial.print("iResetCounter :"); Serial.println(iResetCounter);  

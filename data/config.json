@@ -1,10 +1,11 @@
 {
-    "version": "v0.0.1",
+    "version": "v0.1.0",
     "host": "esp32jukebox",
     "port": 80,
     "user": "admin",
-    "passwd": "admin",
+    "passwd": "*admin!",
     "ap": "AutoConnectAP",
     "appw": "jukebox2wifi",
-    "title": "K'furter Bands"
+    "title": "K'furter Bands",
+    "websrv": 1
 }

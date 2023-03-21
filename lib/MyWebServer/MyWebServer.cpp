@@ -1,5 +1,7 @@
 #include "MyWebServer.h"
 
+//#define TEST_WIFI
+
 String title = "Jukebox";
 
 /**
@@ -76,14 +78,14 @@ String processor(const String& var)
  */
 RetCode listFiles(AsyncWebServerRequest * request) 
 {
+#ifdef DEBUG
     Serial.println("listFiles()");
-
     int args = request->args();
     for(int i=0;i<args;i++)
     {
         Serial.printf("ARG[%s]: %s\n", request->argName(i).c_str(), request->arg(i).c_str());
     }
-
+#endif
     RetCode retCode;
 
     if (!request->hasArg("dir")) 
@@ -101,10 +103,10 @@ RetCode listFiles(AsyncWebServerRequest * request)
 
     String fs   = request->arg("fs"); 
     String path = request->arg("dir");
-
+#ifdef DEBUG
     Serial.print("fs:  "); Serial.println(fs);
     Serial.print("dir: "); Serial.println(path);
-
+#endif
     boolean bRoot = false;
     if( path == "" )
     {
@@ -185,8 +187,9 @@ RetCode listFiles(AsyncWebServerRequest * request)
     }
     retCode.msg += "]";
     dir.close();
-
+#ifdef DEBUG
     Serial.println(retCode.msg);
+#endif
     return retCode;
 }
 
@@ -203,6 +206,7 @@ RetCode listFiles(AsyncWebServerRequest * request)
  */
 void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) 
 {
+#ifdef DEBUG
     Serial.println("handleFileUpload()");
 
     int args = request->args();
@@ -210,7 +214,6 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t in
     {
         Serial.printf("ARG[%s]: %s\n", request->argName(i).c_str(), request->arg(i).c_str());
     }
-
     int params = request->params();
     for(int i=0;i<params;i++)
     {
@@ -229,7 +232,7 @@ void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t in
             Serial.printf("GET[%s]: %s\n", p->name().c_str(), p->value().c_str());
         }
     }    
-
+#endif
     String fsName    = request->getParam("fs")->value();
     fs::FS fs        = SD;
     size_t freespace = SD.totalBytes()-SD.usedBytes();
@@ -288,6 +291,13 @@ void MyWebServer::startWebServer()
     {
         Serial.println("Failed to load config -> restart....");
         ESP.restart();
+    }
+    /*-----------------------------------------------------*/
+    /* check if we should start the webserver              */
+    if( this->configServer->getElement("websrv") == "0" )
+    {
+        Serial.println("start with no webserver!!!");
+        vTaskDelete(NULL);
     }
     /*-----------------------------------------------------*/
     /* connect to Wifi                                     */
@@ -393,6 +403,9 @@ boolean MyWebServer::connectWifi()
     // if connection fails, it starts an access point with the specified name ( "AutoConnectAP"),
     // if empty will auto generate SSID, if password is blank it will be anonymous AP (wm.autoConnect())
     // then goes into a blocking loop awaiting configuration and will return success result
+#ifdef TEST_WIFI
+    wm.resetSettings();
+#endif // TEST_WIFI
     return wm.autoConnect( this->configServer->getElement("ap").c_str(), this->configServer->getElement("appw").c_str()); // password protected ap
 
 }
@@ -406,10 +419,10 @@ boolean MyWebServer::regToMDNS()
 {
     String host = this->configServer->getElement("host").c_str();
     int port    = std::stoi(this->configServer->getElement("port"));
-
+#ifdef DEBUG
     Serial.print("host :"); Serial.println(host);
     Serial.print("port :"); Serial.println(port);
-
+#endif
     if(MDNS.begin(host.c_str())) 
     {
         MDNS.addService("http", "tcp", port);
@@ -645,8 +658,9 @@ bool MyWebServer::loadFromFS(AsyncWebServerRequest *request)
     else if (path.endsWith(".mp4")) { dataType = "audio/mpeg"; }
     else if (path.endsWith(".ogg")) { dataType = "audio/ogg"; }
     else if (path.endsWith(".wav")) { dataType = "audio/wav"; }
-    
+#ifdef DEBUG
     Serial.print("dataType :"); Serial.println(dataType);
+#endif // DEBUG    
 
     File dataFile;
     if(dataType == "audio/mpeg")
@@ -690,6 +704,7 @@ bool MyWebServer::loadFromFS(AsyncWebServerRequest *request)
  */
 void MyWebServer::printAllParams(AsyncWebServerRequest *request)
 {
+#ifdef DEBUG
     Serial.println("printAllParams()");
 
     int params = request->params();
@@ -710,6 +725,7 @@ void MyWebServer::printAllParams(AsyncWebServerRequest *request)
             Serial.printf("GET[%s]: %s\n", p->name().c_str(), p->value().c_str());
         }
     }    
+#endif // DEBUG    
 }
 
 /**
@@ -720,6 +736,7 @@ void MyWebServer::printAllParams(AsyncWebServerRequest *request)
  */
 void MyWebServer::printAllArgs(AsyncWebServerRequest *request)
 {
+#ifdef DEBUG
     Serial.println("printAllArgs()");
     //List all parameters
     int args = request->args();
@@ -727,6 +744,7 @@ void MyWebServer::printAllArgs(AsyncWebServerRequest *request)
     {
         Serial.printf("ARG[%s]: %s\n", request->argName(i).c_str(), request->arg(i).c_str());
     }
+#endif // DEBUG    
 }
 
 /**
@@ -866,7 +884,7 @@ RetCode MyWebServer::sendToAudioPlayer(String *fileName)
  */
 void MyWebServer::createConfigJson()
 {
-    this->configServer->putElement("version", "v0.0.1"           );
+    this->configServer->putElement("version", "v0.1.0"           );
     this->configServer->putElement("host"   , "esp32jukebox"     );
     this->configServer->putElement("port"   , "80"               );
     this->configServer->putElement("user"   , "admin"            );

@@ -4,5 +4,5 @@
 
 /**************** STRUCTURE DEFINITION *****************/
 typedef struct {
-	char str[40];
+	char str[100];
 } my_struct;
