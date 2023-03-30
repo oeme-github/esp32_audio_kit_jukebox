@@ -286,7 +286,8 @@ boolean MyConfigServer::loadConfigMap(String content)
 bool MyConfigServer::containsKey(const char *_index)
 {
   Serial.print("containsKey("); Serial.print(_index); Serial.println(")");
-
+  Serial.print("Format:"); Serial.println(this->format);
+  
   switch (this->format)
   {
   case FileFormat::JSON :

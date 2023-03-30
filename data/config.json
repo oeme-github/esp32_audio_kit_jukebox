@@ -1,5 +1,5 @@
 {
-    "version": "v0.1.0",
+    "version": "v0.1.1",
     "host": "esp32jukebox",
     "port": 80,
     "user": "admin",
@@ -7,5 +7,5 @@
     "ap": "AutoConnectAP",
     "appw": "jukebox2wifi",
     "title": "K'furter Bands",
-    "websrv": 1
+    "websrv": 0
 }

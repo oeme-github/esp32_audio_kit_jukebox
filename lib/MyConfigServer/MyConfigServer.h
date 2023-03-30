@@ -8,7 +8,7 @@
 
 //#define DEBUG 1
 
-#define FIRMWARE_VERSION "v0.0.1"
+#define FIRMWARE_VERSION "v0.1.0"
 #define CONFIG_JSON_SIZE 512
 
 typedef enum FileFormat {JSON, MAP} fileFormat;

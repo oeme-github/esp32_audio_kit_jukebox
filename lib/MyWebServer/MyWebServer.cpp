@@ -40,7 +40,6 @@ String processor(const String& var)
     {
         retString = "Firmware: " + (String)FIRMWARE_VERSION;
     }
-
     if (var == "SPIFFS_FREE") 
     {
         retString = humanReadableSize((SPIFFS.totalBytes() - SPIFFS.usedBytes()));
@@ -69,6 +68,22 @@ String processor(const String& var)
     Serial.print("-> "); Serial.println(retString);
     return retString;
 }
+
+/**
+ * @brief  stopPlay(AsyncWebServerRequest * request)
+ * @note   returns html code and integer
+ * @param  request: pointer to AsyncWebServerRequest
+ * @retval RetCode.msg - Text, RetCode.iRet - Errorcode 
+ */
+RetCode stopPlay(AsyncWebServerRequest * request) 
+{
+    RetCode retCode;
+
+
+
+    return retCode;
+}
+
 
 /**
  * @brief  listFiles(AsyncWebServerRequest * request)
@@ -488,6 +503,26 @@ boolean MyWebServer::begin()
                     request->send(SPIFFS, "/logout.html", String(), false, processor);
                 }
     );           
+    server->on( "/action", 
+                HTTP_GET, 
+                [&](AsyncWebServerRequest * request)
+                {
+                    String logmessage = "Client:" + request->client()->remoteIP().toString() + " " + request->url();
+                    if (this->checkWebAuth(request)) 
+                    {
+                        logmessage += " Auth: Success";
+                        Serial.println(logmessage);
+
+                        RetCode retCode = stopPlay(request);
+                        request->send(retCode.iRet, "text/plain", retCode.msg );
+
+                    } else {
+                        logmessage += " Auth: Failed";
+                        Serial.println(logmessage);
+                        return request->requestAuthentication();
+                    }
+                }
+    );
     server->on( "/list", 
                 HTTP_GET, 
                 [&](AsyncWebServerRequest * request)
@@ -884,7 +919,7 @@ RetCode MyWebServer::sendToAudioPlayer(String *fileName)
  */
 void MyWebServer::createConfigJson()
 {
-    this->configServer->putElement("version", "v0.1.0"           );
+    this->configServer->putElement("version", "v0.1.1"           );
     this->configServer->putElement("host"   , "esp32jukebox"     );
     this->configServer->putElement("port"   , "80"               );
     this->configServer->putElement("user"   , "admin"            );
@@ -892,6 +927,7 @@ void MyWebServer::createConfigJson()
     this->configServer->putElement("ap"     , "AutoConnectAP"    );
     this->configServer->putElement("appw"   , "jukebox2wifi"     );
     this->configServer->putElement("title"  , "K'furter Musikbox");
+    this->configServer->putElement("websrv" , "1"                );
 
     this->configServer->saveToConfigfile();
 }

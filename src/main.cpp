@@ -14,6 +14,7 @@
 
 /*---------------------------------------------------------*/
 /* defines                                                 */
+#define WITH_INA219
 #define I2C_ADDRESS_LETTER 0x40
 #define I2C_ADDRESS_NUMBER 0x41
 #define I2C_SDA 23
@@ -24,6 +25,8 @@
 #define RELAIS_PIN_2 19
 #define RELAIS_EIN HIGH
 #define RELAIS_AUS LOW
+
+#define STOP_PIN 5
 
 //#define DEBUG_MAP
 #define CONFIG_FILE "/config.json"
@@ -42,8 +45,6 @@ MP3DecoderHelix helix;
 EncodedAudioStream decoder;
 StreamCopy copier; 
 File audioFile;
-VolumeStream volume;
-LogarithmicVolumeControl lvc;
 
 MyConfigServer configServer;
 
@@ -96,9 +97,22 @@ void taskAudioPlayerCode( void * pvParameters )
   /* start AudioPlayer                                  */
 	my_struct Rptrtostruct;
 	uint32_t TickDelay = pdMS_TO_TICKS(3000);
+  uint8_t volume;
+  uint8_t maxVolume = 50;
+  uint8_t deltaVolume = 2;
+  uint8_t counter;
+  uint8_t counterStep = 50;
+  boolean stop = false;
+
+  if(configServer.containsKey("volume"))
+  {
+    Serial.println("read max volume...");
+    maxVolume=atoi(configServer.getElement("volume").c_str());
+  }
+  Serial.print("maxVolume:"); Serial.println(maxVolume);
 
   Serial.println( "start decoder..." );
-  decoder.begin(&volume, &helix);
+  decoder.begin(&i2s, &helix);
   Serial.println("prepare copier...");
   copier.setCheckAvailableForWrite(false);
 
@@ -111,23 +125,57 @@ void taskAudioPlayerCode( void * pvParameters )
 		{
    	  Serial.println( "Received from QUEUE:\n" );
    	  Serial.println( Rptrtostruct.str );
-
       Serial.print("<--"); Serial.println(Rptrtostruct.str);
-
       Serial.print("try to open audio file...");
       if( SD.exists(Rptrtostruct.str) )
       {
         Serial.println( "file exists, try to open..." );
         audioFile = SD.open(Rptrtostruct.str);
-        Serial.println( "start copier..." );
         copier.begin(decoder, audioFile);
-        Serial.println( "start copy..." );
-
+        counter = 0;
+        volume  = 0;
         while(copier.copy()) 
         {
+          /*-----------------------------------------------*/
+          /* increase volume                               */
+          counter++;
+          if( !stop && volume < maxVolume && counter%counterStep)
+          {
+            Serial.println(volume);
+            volume = volume+deltaVolume;
+            i2s.setVolume(volume);
+          }
+          /*-----------------------------------------------*/
+          /* STOP-Button                                   */
+          if( digitalRead(STOP_PIN) == 0 )
+          {
+            /*---------------------------------------------*/
+            /* stop pressed                                */
+            stop = true;
+          }
+          /*-----------------------------------------------*/
+          /* stop sequenze                                 */
+          if( stop )
+          {
+            /*---------------------------------------------*/
+            /* decrease volume                             */
+            if(volume > 0 && counter%counterStep)
+            {
+              volume = volume-deltaVolume;
+              i2s.setVolume(volume);
+            }
+            /*---------------------------------------------*/
+            /* stop play                                   */
+            if(volume <= 0)
+            {
+              stop = false;  
+              copier.end();
+            }
+          }
           vTaskDelay(pdMS_TO_TICKS(5));   
         }
         Serial.println("clean up ...");
+        i2s.setVolume(0);
         audioFile.close();
       }
       else
@@ -252,7 +300,7 @@ void createSongsMap()
   }
 #endif
   /*-------------------------------------------------------*/
-  /* savge the map                                         */
+  /* save the map                                          */
   configServer.saveConfig(&mapConfig);
   configServer.printConfig();
 }
@@ -282,6 +330,7 @@ void setup()
     Serial.println("could not load -> create one...");
     createSongsMap();
   }
+#ifdef WITH_INA219
   /*-------------------------------------------------------*/
   /* init INA219                                           */
   Wire.begin(I2C_SDA, I2C_SCL);
@@ -299,6 +348,7 @@ void setup()
   }
   ina219_number.setADCMode(SAMPLE_MODE_16); 
   ina219_number.setPGain(PG_80);
+#endif
   /*-------------------------------------------------------*/
   /* create QUEUE                                          */
   hQueue_global = xQueueCreate(QUEUE_SIZE, sizeof (my_struct));
@@ -315,11 +365,7 @@ void setup()
   auto config = i2s.defaultConfig(TX_MODE);
   config.sd_active = true;
   i2s.begin(config);
-  /*-------------------------------------------------------*/
-  /* set init volume                                       */
-  volume.setTarget(i2s);
-  volume.setVolumeControl(lvc);
-  volume.setVolume(1.0);  
+  i2s.setVolume(0);
   /*-------------------------------------------------------*/
   /* mound file system                                     */
   if(!SD.begin(chipSelect)){
@@ -361,6 +407,8 @@ void setup()
   vTaskDelay(500/portTICK_PERIOD_MS);
   /*-------------------------------------------------------*/
   /* GPIO                                                  */
+  Serial.print("STOP_PIN     : "); Serial.println(STOP_PIN);
+  pinMode(STOP_PIN, INPUT_PULLUP);
   Serial.print("RELAIS_PIN_1 : "); Serial.println(RELAIS_PIN_1);
   pinMode(RELAIS_PIN_1, OUTPUT);
   Serial.print("RELAIS_PIN_2 : "); Serial.println(RELAIS_PIN_2);
@@ -396,19 +444,13 @@ void setup()
  */
 void loop() {
   // put your main code here, to run repeatedly:
-#ifdef TEST_BUTNS
-    potValue1 = AdcConvert(&ina219_letter);
-    Serial.print("NUMBER_BTN value:");   Serial.println(potValue1);
-#else
   /*-------------------------------------------------------*/
   /* check NUMBER button                                   */
+#ifdef WITH_INA219  
   if(!activated1)
   {
     /*-----------------------------------------------------*/
     potValue1 = AdcConvert(&ina219_letter);
-#ifdef TEST_BUTNS
-    Serial.print("NUMBER_BTN value:"); Serial.println(potValue1);
-#endif
     if( potValue1 > 0 )
     {
       activated1 = true;
@@ -422,9 +464,6 @@ void loop() {
   {
     iResetCounter++;
     potValue2 = AdcConvert(&ina219_number);
-#ifdef TEST_BUTNS
-    Serial.print("NUMBER_BTN value:"); Serial.println(potValue2);
-#endif
     if( potValue2 > 0 )
     {
       /*---------------------------------------------------*/
@@ -440,16 +479,11 @@ void loop() {
     /*----------------------------------------------------*/
     /* setup the queue                                    */
     my_struct TXmy_struct;
-#ifdef TEST_BUTNS   
-    Serial.println( "Entered SENDER-Task, about to SEND to the queue..." );
-#endif
     strcpy(TXmy_struct.str, getSong(potValue1, potValue2).c_str());
     /***** send to the queue ****/
     if (xQueueSend(hQueue_global, (void *)&TXmy_struct, portMAX_DELAY) == pdPASS)
     {
-#ifdef TEST_BUTNS      
         Serial.print( "--> filename "); Serial.print(TXmy_struct.str); Serial.println(" sended" );
-#endif
     }
     else
     {
@@ -465,9 +499,6 @@ void loop() {
     configServer.loadConfig(&SPIFFS, SONGS_FILE, FileFormat::MAP);
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
-#ifdef TEST_BUTNS      
-  Serial.print("iResetCounter :"); Serial.println(iResetCounter);  
-#endif
   if( iResetCounter >= 100 )
   {
     /*-----------------------------------------------------*/
@@ -480,6 +511,6 @@ void loop() {
     activeted2 = false;
     iResetCounter = 0;
   }
-#endif
+#endif //WITH_INA219
   vTaskDelay(100/portTICK_PERIOD_MS);
 }
