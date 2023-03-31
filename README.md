@@ -9,5 +9,4 @@
 ![ESP32-Audio-Kit](esp32_audio_kit.jpg)
 
 ## Doku
-
-![Doku](./doc/esp32_audio_kid_jukebox.pdf)
+![](./doc/esp32_audio_kid_jukebox.pdf)
